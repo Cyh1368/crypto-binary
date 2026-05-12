@@ -1,0 +1,26 @@
+symbol: BTC_USDT
+timeframe: 15m
+history_bars: 50000
+raw_dir: data/raw
+processed_dir: data/processed
+features_dir: data/features
+datasets_dir: data/datasets
+reference_price:
+  venues:
+    coinbase: 0.35
+    kraken: 0.30
+    bitstamp: 0.20
+    gemini: 0.10
+    itbit: 0.05
+exchange_symbols:
+  kraken_futures:
+    BTC_USDT: PI_XBTUSD
+    ETH_USDT: PI_ETHUSD
+    SOL_USDT: SOL/USD:USD
+  binance_vision:
+    BTC_USDT: BTCUSDT
+    ETH_USDT: ETHUSDT
+    SOL_USDT: SOLUSDT
+costs:
+  transaction_cost_bps: 2.0
+  slippage_bps: 1.0
