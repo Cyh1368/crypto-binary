@@ -331,7 +331,18 @@ class LivePaperTrader:
         if not predictions_path.exists():
             return
 
-        predictions = pd.read_csv(predictions_path)
+        predictions = pd.read_csv(
+            predictions_path,
+            dtype={
+                "timestamp": object,
+                "direction": object,
+                "action": object,
+                "actual_direction_15m": object,
+                "prediction_correct": object,
+                "evaluated_at": object,
+            },
+            keep_default_na=False,
+        )
         required_cols = [
             "actual_close_15m",
             "actual_return_15m",
@@ -342,6 +353,7 @@ class LivePaperTrader:
         for col in required_cols:
             if col not in predictions:
                 predictions[col] = ""
+            predictions[col] = predictions[col].astype(object)
 
         predictions["timestamp"] = pd.to_datetime(predictions["timestamp"], utc=True)
         frame = frame.sort_index()

@@ -20,3 +20,112 @@ RuntimeError: Failed to fetch live market data after 3 attempts: krakenfutures G
 2026-05-12 16:38:21,221 [INFO] Starting BTC LightGBM paper trader. once=True
 2026-05-12 16:38:23,525 [INFO] BTC DOWN | close=80778.00 | p_up=37.45% p_down=62.55% | signal=DOWN | action=HOLD | equity=9997.00
 2026-05-12 16:38:23,525 [INFO] Completed cycle: {"timestamp": "2026-05-12T20:15:00+00:00", "close": 80778.0, "prediction": {"prob_up": 0.3745277186678098, "prob_down": 0.6254722813321902, "up_percent": 37.452771866780985, "down_percent": 62.54722813321902, "direction": "DOWN", "confidence_percent": 62.54722813321902, "fold_probabilities": [0.35457019022556796, 0.34217941782117006, 0.39418818427596614, 0.4218616130025265, 0.45623702294946794, 0.44761537747748875, 0.36122479243171507, 0.43091285765816056, 0.3592741837776703, 0.3983359996493406, 0.42525556735032655, 0.3127756911185348, 0.26821648469983106, 0.35034906001864813, 0.32135353620684126, 0.3483347369299182, 0.37428650175959244]}, "position": {"timestamp": "2026-05-12T20:15:00+00:00", "action": "HOLD", "position": -1, "price": 80778.0, "entry_price": 80778.0, "qty": 0.12379608309193098, "realized_pnl_step": 0.0, "fee_step": 0.0, "realized_pnl_total": 0.0, "unrealized_pnl": -0.0, "cash_equity": 9997.0, "total_equity": 9997.0}}
+2026-05-12 16:43:38,347 [INFO] Starting BTC LightGBM paper trader. once=False
+2026-05-12 16:43:40,624 [INFO] BTC DOWN | close=80778.00 | p_up=37.45% p_down=62.55% | signal=DOWN | action=HOLD | equity=9997.00
+2026-05-12 16:43:40,625 [INFO] Completed cycle: {"timestamp": "2026-05-12T20:15:00+00:00", "close": 80778.0, "prediction": {"prob_up": 0.3745277186678098, "prob_down": 0.6254722813321902, "up_percent": 37.452771866780985, "down_percent": 62.54722813321902, "direction": "DOWN", "confidence_percent": 62.54722813321902, "fold_probabilities": [0.35457019022556796, 0.34217941782117006, 0.39418818427596614, 0.4218616130025265, 0.45623702294946794, 0.44761537747748875, 0.36122479243171507, 0.43091285765816056, 0.3592741837776703, 0.3983359996493406, 0.42525556735032655, 0.3127756911185348, 0.26821648469983106, 0.35034906001864813, 0.32135353620684126, 0.3483347369299182, 0.37428650175959244]}, "position": {"timestamp": "2026-05-12T20:15:00+00:00", "action": "HOLD", "position": -1, "price": 80778.0, "entry_price": 80778.0, "qty": 0.12379608309193098, "realized_pnl_step": 0.0, "fee_step": 0.0, "realized_pnl_total": 0.0, "unrealized_pnl": -0.0, "cash_equity": 9997.0, "total_equity": 9997.0}}
+2026-05-12 16:43:40,625 [INFO] Waiting 89.4s until 2026-05-12T20:45:10+00:00
+2026-05-12 16:45:11,440 [ERROR] Paper trading cycle failed
+Traceback (most recent call last):
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/frame.py", line 4911, in _set_value
+    self._mgr.column_setitem(icol, iindex, value, inplace_only=True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/internals/managers.py", line 1526, in column_setitem
+    col_mgr.setitem_inplace(idx, value)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/internals/managers.py", line 2228, in setitem_inplace
+    value = np_can_hold_element(arr.dtype, value)
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/dtypes/cast.py", line 1792, in np_can_hold_element
+    raise LossySetitemError
+pandas.errors.LossySetitemError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/internals/blocks.py", line 1115, in setitem
+    casted = np_can_hold_element(values.dtype, value)
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/dtypes/cast.py", line 1792, in np_can_hold_element
+    raise LossySetitemError
+pandas.errors.LossySetitemError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/chengyou1368/crypto-binary/binary-paper-trading/run_live_paper_trading.py", line 433, in run
+    result = self.step()
+  File "/home/chengyou1368/crypto-binary/binary-paper-trading/run_live_paper_trading.py", line 402, in step
+    self.evaluate_pending_predictions(frame)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-paper-trading/run_live_paper_trading.py", line 365, in evaluate_pending_predictions
+    predictions.at[idx, "actual_direction_15m"] = actual_direction
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/indexing.py", line 2592, in __setitem__
+    return super().__setitem__(key, value)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/indexing.py", line 2542, in __setitem__
+    self.obj._set_value(*key, value=value, takeable=self._takeable)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/frame.py", line 4922, in _set_value
+    self.loc[index, col] = value
+    ~~~~~~~~^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/indexing.py", line 938, in __setitem__
+    iloc._setitem_with_indexer(indexer, value, self.name)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/indexing.py", line 1953, in _setitem_with_indexer
+    self._setitem_with_indexer_split_path(indexer, value, name)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/indexing.py", line 2044, in _setitem_with_indexer_split_path
+    self._setitem_single_column(loc, value, pi)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/indexing.py", line 2181, in _setitem_single_column
+    self.obj._mgr.column_setitem(loc, plane_indexer, value)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/internals/managers.py", line 1528, in column_setitem
+    new_mgr = col_mgr.setitem((idx,), value)
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/internals/managers.py", line 607, in setitem
+    return self.apply("setitem", indexer=indexer, value=value)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/internals/managers.py", line 445, in apply
+    applied = getattr(b, f)(**kwargs)
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/internals/blocks.py", line 1118, in setitem
+    nb = self.coerce_to_target_dtype(value, raise_on_upcast=True)
+  File "/home/chengyou1368/crypto-binary/binary-venv/lib/python3.14/site-packages/pandas/core/internals/blocks.py", line 468, in coerce_to_target_dtype
+    raise TypeError(f"Invalid value '{other}' for dtype '{self.values.dtype}'")
+TypeError: Invalid value 'DOWN' for dtype 'float64'
+2026-05-12 16:45:11,450 [INFO] Waiting 898.5s until 2026-05-12T21:00:10+00:00
+2026-05-12 16:49:04,599 [INFO] Starting BTC LightGBM paper trader. once=False
+2026-05-12 16:49:06,649 [INFO] Evaluated DOWN prediction from 2026-05-12T20:15:00+00:00: actual=DOWN return=-0.001301 correct=True
+2026-05-12 16:49:06,650 [INFO] Evaluated DOWN prediction from 2026-05-12T20:15:00+00:00: actual=DOWN return=-0.001301 correct=True
+2026-05-12 16:49:06,650 [INFO] Evaluated DOWN prediction from 2026-05-12T20:15:00+00:00: actual=DOWN return=-0.001301 correct=True
+2026-05-12 16:49:06,650 [INFO] Evaluated DOWN prediction from 2026-05-12T20:15:00+00:00: actual=DOWN return=-0.001301 correct=True
+2026-05-12 16:49:06,875 [INFO] BTC DOWN | close=80673.00 | p_up=35.04% p_down=64.96% | signal=DOWN | action=HOLD | equity=10010.00
+2026-05-12 16:49:06,876 [INFO] Completed cycle: {"timestamp": "2026-05-12T20:30:00+00:00", "close": 80673.0, "prediction": {"prob_up": 0.35038608343932603, "prob_down": 0.649613916560674, "up_percent": 35.0386083439326, "down_percent": 64.9613916560674, "direction": "DOWN", "confidence_percent": 64.9613916560674, "fold_probabilities": [0.3715679705770568, 0.3822054320722669, 0.38992359203761856, 0.3575469217325861, 0.34649881542841154, 0.33822282792892716, 0.3285927698964858, 0.3128543361702589, 0.34818143562303167, 0.39040131828822816, 0.4219452976784066, 0.31024858170382447, 0.2688713317244262, 0.3634875055396353, 0.3060587263626448, 0.34695048365756775, 0.3730060720471667]}, "position": {"timestamp": "2026-05-12T20:30:00+00:00", "action": "HOLD", "position": -1, "price": 80673.0, "entry_price": 80778.0, "qty": 0.12379608309193098, "realized_pnl_step": 0.0, "fee_step": 0.0, "realized_pnl_total": 0.0, "unrealized_pnl": 12.998588724652752, "cash_equity": 9997.0, "total_equity": 10009.998588724653}}
+2026-05-12 16:49:06,876 [INFO] Waiting 663.1s until 2026-05-12T21:00:10+00:00
+2026-05-12 17:00:11,344 [INFO] Evaluated DOWN prediction from 2026-05-12T20:30:00+00:00: actual=DOWN return=-0.000161 correct=True
+2026-05-12 17:00:11,586 [INFO] BTC DOWN | close=80660.00 | p_up=35.46% p_down=64.54% | signal=DOWN | action=HOLD | equity=10011.61
+2026-05-12 17:00:11,587 [INFO] Completed cycle: {"timestamp": "2026-05-12T20:45:00+00:00", "close": 80660.0, "prediction": {"prob_up": 0.3545780138687753, "prob_down": 0.6454219861312247, "up_percent": 35.45780138687753, "down_percent": 64.54219861312247, "direction": "DOWN", "confidence_percent": 64.54219861312247, "fold_probabilities": [0.3603160867973711, 0.38157594156374125, 0.38936641866766103, 0.3550721875456315, 0.34649881542841154, 0.33940887738325914, 0.3285927698964858, 0.3110097604849917, 0.3482319890097653, 0.40365833145812857, 0.4219452976784066, 0.337325358265715, 0.2616556405456676, 0.38392912456688433, 0.3289089501920111, 0.3573246142378823, 0.3730060720471667]}, "position": {"timestamp": "2026-05-12T20:45:00+00:00", "action": "HOLD", "position": -1, "price": 80660.0, "entry_price": 80778.0, "qty": 0.12379608309193098, "realized_pnl_step": 0.0, "fee_step": 0.0, "realized_pnl_total": 0.0, "unrealized_pnl": 14.607937804847856, "cash_equity": 9997.0, "total_equity": 10011.607937804847}}
+2026-05-12 17:00:11,587 [INFO] Waiting 898.4s until 2026-05-12T21:15:10+00:00
+2026-05-12 17:15:13,529 [WARNING] Fetch attempt 1/3 failed: krakenfutures GET https://futures.kraken.com/derivatives/api/v3/orderbook?symbol=PF_XBTUSD 503 Service Unavailable <html><body><h1>503 Service Unavailable</h1>
+No server is available to handle this request.
+</body></html>
+2026-05-12 17:15:24,536 [WARNING] Fetch attempt 2/3 failed: krakenfutures GET https://futures.kraken.com/derivatives/api/v3/orderbook?symbol=PF_XBTUSD 503 Service Unavailable <html><body><h1>503 Service Unavailable</h1>
+No server is available to handle this request.
+</body></html>
+2026-05-12 17:15:31,173 [WARNING] Fetch attempt 3/3 failed: krakenfutures GET https://futures.kraken.com/derivatives/api/v3/orderbook?symbol=PF_XBTUSD 503 Service Unavailable <html><body><h1>503 Service Unavailable</h1>
+No server is available to handle this request.
+</body></html>
+2026-05-12 17:15:31,173 [ERROR] Paper trading cycle failed
+Traceback (most recent call last):
+  File "/home/chengyou1368/crypto-binary/binary-paper-trading/run_live_paper_trading.py", line 445, in run
+    result = self.step()
+  File "/home/chengyou1368/crypto-binary/binary-paper-trading/run_live_paper_trading.py", line 413, in step
+    frame = self.fetch_market_frame()
+  File "/home/chengyou1368/crypto-binary/binary-paper-trading/run_live_paper_trading.py", line 147, in fetch_market_frame
+    raise RuntimeError(f"Failed to fetch live market data after {retry_attempts} attempts: {last_error}")
+RuntimeError: Failed to fetch live market data after 3 attempts: krakenfutures GET https://futures.kraken.com/derivatives/api/v3/orderbook?symbol=PF_XBTUSD 503 Service Unavailable <html><body><h1>503 Service Unavailable</h1>
+No server is available to handle this request.
+</body></html>
+2026-05-12 17:15:31,181 [INFO] Waiting 878.8s until 2026-05-12T21:30:10+00:00
+2026-05-12 17:30:11,544 [INFO] Evaluated DOWN prediction from 2026-05-12T20:45:00+00:00: actual=UP return=0.000471 correct=False
+2026-05-12 17:30:11,831 [INFO] BTC DOWN | close=80628.00 | p_up=35.88% p_down=64.12% | signal=DOWN | action=HOLD | equity=10015.57
+2026-05-12 17:30:11,831 [INFO] Completed cycle: {"timestamp": "2026-05-12T21:15:00+00:00", "close": 80628.0, "prediction": {"prob_up": 0.3588134240946532, "prob_down": 0.6411865759053468, "up_percent": 35.88134240946532, "down_percent": 64.11865759053468, "direction": "DOWN", "confidence_percent": 64.11865759053468, "fold_probabilities": [0.36677980784519926, 0.37968710119323845, 0.38936641866766103, 0.3340531861901544, 0.33778394501640197, 0.3328770264411291, 0.3285927698964858, 0.3165359717994868, 0.3573651539644159, 0.4146339496372916, 0.4219452976784066, 0.35608216640669405, 0.3349928527548349, 0.3883573546282537, 0.31982647700882477, 0.34695048365756775, 0.37399824682305943]}, "position": {"timestamp": "2026-05-12T21:15:00+00:00", "action": "HOLD", "position": -1, "price": 80628.0, "entry_price": 80778.0, "qty": 0.12379608309193098, "realized_pnl_step": 0.0, "fee_step": 0.0, "realized_pnl_total": 0.0, "unrealized_pnl": 18.569412463789646, "cash_equity": 9997.0, "total_equity": 10015.56941246379}}
+2026-05-12 17:30:11,831 [INFO] Waiting 898.2s until 2026-05-12T21:45:10+00:00
