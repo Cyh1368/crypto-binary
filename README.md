@@ -3,6 +3,7 @@
 ## Progress: May 13, 2026
 - Implemented live paper trading and web hosting
 - Codex implemented a backtest trading spot BTC, but that's not what this model would be used for so it shouldn't be a big deal for now.
+- Side note: I have previously tried to predict the actual BTC price in 15 minutes. A contamination of validation data tricked me into thinking that it worked, which it didn't at all. After some research, I have found predicting direction to be more feasible; XGBoost and LightGBM are the best lightweight models for this task, so I chose the latter. 
 
 ### Problems
 - Kalshi's strike price is very hard to predict; it is not the price listed on Kraken, the main data source for the model, nor what is shown on CF Benchmarks' BRTI, which Kalshi claims its prices are based on. I'm not sure whether this will be a big problem, as all that the model needs to predict is the direction, not the exact value of bitcoin. Fortunately, I've found Polymarket's prices to match Kraken's very well. Sadly, Polymarket faces more regulation than Kalshi in the US.
