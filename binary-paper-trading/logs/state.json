@@ -1,8 +1,8 @@
 {
-  "equity": 9935.196182189511,
+  "equity": 10091.508635251932,
   "position": 0,
   "entry_price": 0.0,
   "qty": 0.0,
-  "realized_pnl": -58.82029204728602,
-  "last_prediction_ts": "2026-05-13T04:30:00+00:00"
+  "realized_pnl": 121.33426786664222,
+  "last_prediction_ts": "2026-05-13T16:45:00+00:00"
 }
