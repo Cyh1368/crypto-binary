@@ -3,6 +3,24 @@
 ### Codex Fix: Feature Order
 Fixed a live-inference artifact bug where the saved model feature list was derived from aggregated feature importance, which reordered the model inputs relative to training. The pipeline now preserves the original trained feature order when saving `outputs/models/lightgbm_model.pkl`, preventing live predictions from feeding LightGBM columns in the wrong order.
 
+### New Model: Balanced Dataset
+The live prediction script now uses the balanced LightGBM artifact at `outputs/balanced_50_50/models/lightgbm_model.pkl`. The training pipeline balances each walk-forward train, validation, and test split independently after chronological splitting, so each split has exactly 50% UP and 50% DOWN labels without moving rows between train, validation, and test windows.
+
+This removes the old class-prior issue where the original dataset was roughly 40% UP and 60% DOWN. On the original test set, an always-DOWN predictor could score about 60% accuracy, so plain accuracy was misleading. On the balanced test set, the always-UP and always-DOWN baselines are both 50%.
+
+Balanced model results:
+
+| Dataset | Rows | UP ratio | Accuracy | Balanced accuracy | ROC AUC | F1 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced test | 27,094 | 0.5000 | 0.5476 | 0.5476 | 0.5678 | 0.5713 |
+| Balanced validation | 27,342 | 0.5000 | 0.5467 | 0.5467 | 0.5731 | 0.5767 |
+
+The live script is now prediction-only: it fetches live Kraken Futures data, builds the ordered model feature row, averages the fold probabilities, and writes whether BTC is predicted to go UP or DOWN over the next 15 minutes. It no longer opens simulated long/short positions or tracks paper account equity.
+
+![Balanced model calibration curve](outputs/balanced_50_50/figures/validation_calibration_curve.png)
+
+![Balanced model confusion matrix](outputs/balanced_50_50/figures/validation_confusion_matrix.png)
+
 ## Progress: May 13, 2026
 - Implemented live paper trading and web hosting
 - Codex implemented a backtest trading spot BTC, but that's not what this model would be used for so it shouldn't be a big deal for now.
@@ -264,15 +282,12 @@ The live trader:
 - Averages probabilities across the saved LightGBM fold models.
 - Writes one prediction row per cycle to `binary-paper-trading/logs/predictions.csv`.
 - Evaluates pending predictions once the matching future 15-minute candle is available.
-- Tracks a simulated paper account and position state.
+- Does not place or simulate long/short positions.
 
 Paper-trading config is in `binary-paper-trading/config.yaml`:
 
 ```yaml
-initial_equity: 10000.0
-notional_fraction: 1.0
-fee_bps: 2.0
-slippage_bps: 1.0
+model_path: outputs/balanced_50_50/models/lightgbm_model.pkl
 seconds_after_boundary: 10
 retry_attempts: 3
 retry_sleep_seconds: 5
@@ -286,9 +301,7 @@ binary-paper-trading/logs/
 ├── predictions.csv
 ├── actual_outcomes.csv
 ├── price_actions.csv
-├── paper_positions.csv
-├── feature_snapshots.jsonl
-└── state.json
+└── feature_snapshots.jsonl
 ```
 
 ## Run HTTP Dashboard

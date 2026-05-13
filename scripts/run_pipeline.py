@@ -53,7 +53,7 @@ def load_or_download_raw(data_cfg: dict, force_download: bool = False) -> pd.Dat
     return raw
 
 
-def run(force_download: bool = False) -> None:
+def run(force_download: bool = False, balance_splits: bool = False, output_subdir: str | None = None) -> None:
     data_cfg = load_yaml(ROOT / "config/data.yaml")
     model_cfg = load_yaml(ROOT / "config/model.yaml")
     feature_cfg = load_yaml(ROOT / "config/feature_config.yaml")
@@ -69,22 +69,27 @@ def run(force_download: bool = False) -> None:
     save_parquet(dataset, dataset_path)
     LOGGER.info("Saved feature dataset with %s rows and %s features to %s", len(dataset), len(feature_cols), dataset_path)
 
-    models, predictions, importance, shap_importance = train_walk_forward(
+    models, predictions, validation_predictions, importance, shap_importance, balance_report = train_walk_forward(
         dataset,
         feature_cols,
         model_params=model_cfg["lightgbm"],
         split_config=model_cfg["walk_forward"],
         early_stopping_rounds=int(model_cfg["early_stopping_rounds"]),
+        balance_splits=balance_splits,
     )
 
     outputs = ROOT / "outputs"
+    if output_subdir:
+        outputs = outputs / output_subdir
     trained_feature_set = set(importance["feature"])
     trained_features = [col for col in feature_cols if col in trained_feature_set]
     save_training_artifacts(models, trained_features, outputs / "models")
     save_parquet(predictions, outputs / "predictions/test_predictions.parquet")
+    save_parquet(validation_predictions, outputs / "predictions/validation_predictions.parquet")
     save_parquet(predictions[["prob_up"]], outputs / "predictions/probabilities.parquet")
     importance.to_csv(ensure_dir(outputs / "metrics") / "feature_importance.csv", index=False)
     shap_importance.to_csv(outputs / "metrics/shap_importance.csv", index=False)
+    balance_report.to_csv(outputs / "metrics/split_class_balance.csv", index=False)
 
     backtest = build_strategy_returns(
         predictions,
@@ -98,6 +103,9 @@ def run(force_download: bool = False) -> None:
     cls = classification_metrics(predictions["target"], predictions["prob_up"])
     cls.update(statistical_tests(predictions))
     save_json(cls, outputs / "metrics/classification_metrics.json")
+    validation_cls = classification_metrics(validation_predictions["target"], validation_predictions["prob_up"])
+    validation_cls.update(statistical_tests(validation_predictions))
+    save_json(validation_cls, outputs / "metrics/validation_classification_metrics.json")
     save_json(financial_metrics(backtest), outputs / "metrics/financial_metrics.json")
     reg = regime_metrics(predictions)
     save_json(reg, outputs / "metrics/regime_metrics.json")
@@ -112,6 +120,17 @@ def run(force_download: bool = False) -> None:
 
     save_confusion_matrix(predictions["target"], predictions["prob_up"], outputs / "figures/confusion_matrix.png")
     save_prediction_actual_heatmap(predictions, outputs / "figures/prediction_actual_heatmap.png")
+    save_confusion_matrix(
+        validation_predictions["target"],
+        validation_predictions["prob_up"],
+        outputs / "figures/validation_confusion_matrix.png",
+    )
+    save_prediction_actual_heatmap(validation_predictions, outputs / "figures/validation_prediction_actual_heatmap.png")
+    save_calibration_curve(
+        validation_predictions["target"],
+        validation_predictions["prob_up"],
+        outputs / "figures/validation_calibration_curve.png",
+    )
     save_feature_importance(importance, outputs / "figures/feature_importance.png")
     save_shap_importance(shap_importance, outputs / "figures/shap_importance.png")
     save_calibration_curve(predictions["target"], predictions["prob_up"], outputs / "figures/calibration_curve.png")
@@ -123,9 +142,18 @@ def run(force_download: bool = False) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run BTC 15-minute direction prediction pipeline.")
     parser.add_argument("--force-download", action="store_true", help="Ignore cached parquet and download real data again.")
+    parser.add_argument(
+        "--balance-splits",
+        action="store_true",
+        help="Downsample each train/validation/test split to exactly 50%% up and 50%% down after chronological splitting.",
+    )
+    parser.add_argument(
+        "--output-subdir",
+        help="Write artifacts under outputs/<output-subdir> instead of overwriting the default outputs directory.",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    run(force_download=args.force_download)
+    run(force_download=args.force_download, balance_splits=args.balance_splits, output_subdir=args.output_subdir)

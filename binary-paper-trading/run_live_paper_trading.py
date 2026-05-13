@@ -7,7 +7,6 @@ import logging
 import os
 import sys
 import time
-from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -32,16 +31,6 @@ from src.features.volatility import add_volatility_regimes
 
 PRICE_WINDOWS = [1, 3, 5, 15, 30, 60]
 ORDERBOOK_LEVELS = [5, 10, 20, 50]
-
-
-@dataclass
-class PaperState:
-    equity: float
-    position: int = 0
-    entry_price: float = 0.0
-    qty: float = 0.0
-    realized_pnl: float = 0.0
-    last_prediction_ts: str | None = None
 
 
 def utc_now() -> datetime:
@@ -110,19 +99,17 @@ class LivePaperTrader:
         artifact = joblib.load(ROOT / self.config["model_path"])
         self.models = artifact["models"]
         self.feature_cols = artifact["feature_cols"]
-        self.state_path = self.logs_dir / "state.json"
-        self.state = self._load_state()
+        self._validate_model_features()
 
-    def _load_state(self) -> PaperState:
-        if self.state_path.exists():
-            with self.state_path.open("r", encoding="utf-8") as f:
-                return PaperState(**json.load(f))
-        return PaperState(equity=float(self.config["paper_account"]["initial_equity"]))
-
-    def _save_state(self) -> None:
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
-        with self.state_path.open("w", encoding="utf-8") as f:
-            json.dump(asdict(self.state), f, indent=2)
+    def _validate_model_features(self) -> None:
+        if not self.feature_cols:
+            raise RuntimeError("Model artifact does not contain feature columns")
+        for idx, model in enumerate(self.models):
+            booster_features = list(model.booster_.feature_name())
+            if booster_features != list(self.feature_cols):
+                raise RuntimeError(
+                    f"Model fold {idx} feature order does not match artifact feature_cols; refusing live prediction"
+                )
 
     def fetch_market_frame(self) -> pd.DataFrame:
         symbol = self.config["symbol"]
@@ -177,6 +164,13 @@ class LivePaperTrader:
         latest_ts = features.index[-1]
         latest_features = features.loc[latest_ts].copy()
         model_row = latest_features.reindex(self.feature_cols).astype(float)
+        missing = model_row[model_row.isna()]
+        if not missing.empty:
+            missing_cols = ", ".join(missing.index.tolist())
+            raise RuntimeError(f"Live feature row is missing model inputs: {missing_cols}")
+        if not np.isfinite(model_row.to_numpy(dtype=float)).all():
+            bad_cols = model_row.index[~np.isfinite(model_row.to_numpy(dtype=float))].tolist()
+            raise RuntimeError(f"Live feature row has non-finite model inputs: {', '.join(bad_cols)}")
         return latest_ts, latest_features, model_row
 
     def predict(self, model_row: pd.Series) -> dict[str, Any]:
@@ -196,71 +190,12 @@ class LivePaperTrader:
             "fold_probabilities": fold_probabilities,
         }
 
-    def update_paper_position(self, ts: pd.Timestamp, price: float, prediction: dict[str, Any]) -> dict[str, Any]:
-        thresholds = self.config["decision_thresholds"]
-        account = self.config["paper_account"]
-        desired_position = 0
-        if prediction["prob_up"] > float(thresholds["long"]):
-            desired_position = 1
-        elif prediction["prob_up"] < float(thresholds["short"]):
-            desired_position = -1
-
-        action = "HOLD"
-        realized_this_step = 0.0
-        fee_this_step = 0.0
-        cost_rate = (float(account["fee_bps"]) + float(account["slippage_bps"])) / 10000.0
-
-        if self.state.position != 0 and desired_position != self.state.position:
-            gross_pnl = self.state.qty * (price - self.state.entry_price) * self.state.position
-            exit_fee = self.state.qty * price * cost_rate
-            realized_this_step += gross_pnl - exit_fee
-            fee_this_step += exit_fee
-            self.state.equity += gross_pnl - exit_fee
-            self.state.realized_pnl += gross_pnl - exit_fee
-            action = "EXIT_LONG" if self.state.position == 1 else "EXIT_SHORT"
-            self.state.position = 0
-            self.state.entry_price = 0.0
-            self.state.qty = 0.0
-
-        if desired_position != 0 and self.state.position == 0:
-            notional = self.state.equity * float(account["notional_fraction"])
-            entry_fee = notional * cost_rate
-            self.state.equity -= entry_fee
-            fee_this_step += entry_fee
-            self.state.position = desired_position
-            self.state.entry_price = price
-            self.state.qty = notional / price
-            action = "ENTER_LONG" if desired_position == 1 else "ENTER_SHORT"
-
-        unrealized = 0.0
-        if self.state.position != 0:
-            unrealized = self.state.qty * (price - self.state.entry_price) * self.state.position
-        total_equity = self.state.equity + unrealized
-        self.state.last_prediction_ts = ts.isoformat()
-        self._save_state()
-
-        return {
-            "timestamp": ts.isoformat(),
-            "action": action,
-            "position": self.state.position,
-            "price": price,
-            "entry_price": self.state.entry_price,
-            "qty": self.state.qty,
-            "realized_pnl_step": realized_this_step,
-            "fee_step": fee_this_step,
-            "realized_pnl_total": self.state.realized_pnl,
-            "unrealized_pnl": unrealized,
-            "cash_equity": self.state.equity,
-            "total_equity": total_equity,
-        }
-
     def log_cycle(
         self,
         ts: pd.Timestamp,
         frame: pd.DataFrame,
         latest_features: pd.Series,
         prediction: dict[str, Any],
-        position_row: dict[str, Any],
     ) -> None:
         contract_ts = ts + pd.Timedelta(minutes=15)
         raw = frame.loc[ts]
@@ -297,8 +232,6 @@ class LivePaperTrader:
             "up_percent": prediction["up_percent"],
             "down_percent": prediction["down_percent"],
             "confidence_percent": prediction["confidence_percent"],
-            "action": position_row["action"],
-            "position": position_row["position"],
             "actual_close_15m": "",
             "actual_return_15m": "",
             "actual_direction_15m": "",
@@ -306,7 +239,6 @@ class LivePaperTrader:
             "evaluated_at": "",
         }
         append_csv(self.logs_dir / "predictions.csv", prediction_row, list(prediction_row.keys()))
-        append_csv(self.logs_dir / "paper_positions.csv", position_row, list(position_row.keys()))
 
         feature_payload = {
             "timestamp": ts.isoformat(),
@@ -318,7 +250,7 @@ class LivePaperTrader:
             f.write(json.dumps(feature_payload, default=json_default, sort_keys=True) + "\n")
 
         self.logger.info(
-            "BTC %s | contract=%s | model_input_candle_close=%s | model_input_close=%.2f | p_up=%.2f%% p_down=%.2f%% | signal=%s | action=%s | equity=%.2f",
+            "BTC %s | contract=%s | model_input_candle_close=%s | model_input_close=%.2f | p_up=%.2f%% p_down=%.2f%% | signal=%s",
             prediction["direction"],
             contract_ts.isoformat(),
             contract_ts.isoformat(),
@@ -326,8 +258,6 @@ class LivePaperTrader:
             prediction["up_percent"],
             prediction["down_percent"],
             prediction["direction"],
-            position_row["action"],
-            position_row["total_equity"],
         )
 
     def evaluate_pending_predictions(self, frame: pd.DataFrame) -> None:
@@ -422,14 +352,12 @@ class LivePaperTrader:
         contract_ts = ts + pd.Timedelta(minutes=15)
         prediction = self.predict(model_row)
         price = float(frame.loc[ts, "close"])
-        position_row = self.update_paper_position(contract_ts, price, prediction)
-        self.log_cycle(ts, frame, latest_features, prediction, position_row)
+        self.log_cycle(ts, frame, latest_features, prediction)
         return {
             "timestamp": contract_ts.isoformat(),
             "model_input_timestamp": contract_ts.isoformat(),
             "close": price,
             "prediction": prediction,
-            "position": position_row,
         }
 
     def sleep_until_next_boundary(self) -> None:
@@ -447,7 +375,7 @@ class LivePaperTrader:
         time.sleep(sleep_seconds)
 
     def run(self, once: bool = False) -> None:
-        self.logger.info("Starting BTC LightGBM paper trader. once=%s", once)
+        self.logger.info("Starting BTC LightGBM live direction predictor. once=%s", once)
         while True:
             try:
                 result = self.step()

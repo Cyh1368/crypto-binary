@@ -1,10 +1,10 @@
-# BTC Live Paper Trading
+# BTC Live Direction Prediction
 
-BTC-only live paper trader for the trained LightGBM direction model.
+BTC-only live predictor for the trained LightGBM direction model.
 
 It wakes up on 15-minute boundaries, fetches real Kraken Futures data, computes live features, predicts the probability that BTC will be up over the next 15-minute bar, and records every cycle.
 
-No orders are sent to an exchange.
+No orders are sent to an exchange, and no simulated long/short positions are opened.
 
 ## Run Once
 
@@ -34,5 +34,3 @@ Outputs are written under `binary-paper-trading/logs/`:
 - `predictions.csv`: one row per 15-minute prediction
 - `price_actions.csv`: OHLCV and current market state per cycle
 - `feature_snapshots.jsonl`: complete feature dictionary per cycle
-- `paper_positions.csv`: simulated position/equity state per cycle
-- `state.json`: latest paper account state for restart continuity
