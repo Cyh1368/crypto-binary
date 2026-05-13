@@ -93,8 +93,8 @@ def train_walk_forward(
         models.append(model)
 
     predictions_df = pd.concat(predictions).sort_index()
-    importance_df = pd.concat(importances).groupby("feature", as_index=False)[["gain", "split"]].mean()
-    shap_df = pd.concat(shap_frames).groupby("feature", as_index=False)["mean_abs_shap"].mean()
+    importance_df = pd.concat(importances).groupby("feature", as_index=False, sort=False)[["gain", "split"]].mean()
+    shap_df = pd.concat(shap_frames).groupby("feature", as_index=False, sort=False)["mean_abs_shap"].mean()
     return models, predictions_df, importance_df, shap_df
 
 

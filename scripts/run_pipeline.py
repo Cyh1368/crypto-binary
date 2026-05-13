@@ -78,7 +78,8 @@ def run(force_download: bool = False) -> None:
     )
 
     outputs = ROOT / "outputs"
-    trained_features = importance["feature"].tolist()
+    trained_feature_set = set(importance["feature"])
+    trained_features = [col for col in feature_cols if col in trained_feature_set]
     save_training_artifacts(models, trained_features, outputs / "models")
     save_parquet(predictions, outputs / "predictions/test_predictions.parquet")
     save_parquet(predictions[["prob_up"]], outputs / "predictions/probabilities.parquet")

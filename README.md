@@ -1,5 +1,8 @@
 # BTC 15-Minute Direction Prediction System
 
+### Codex Fix: Feature Order
+Fixed a live-inference artifact bug where the saved model feature list was derived from aggregated feature importance, which reordered the model inputs relative to training. The pipeline now preserves the original trained feature order when saving `outputs/models/lightgbm_model.pkl`, preventing live predictions from feeding LightGBM columns in the wrong order.
+
 ## Progress: May 13, 2026
 - Implemented live paper trading and web hosting
 - Codex implemented a backtest trading spot BTC, but that's not what this model would be used for so it shouldn't be a big deal for now.
