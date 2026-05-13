@@ -1,0 +1,15 @@
+{
+  "asset": "BNB",
+  "best_test_regime": "volatility_regime=low",
+  "best_test_regime_balanced_accuracy": 0.5249089072168722,
+  "best_validation_regime": "volatility_regime=medium",
+  "best_validation_regime_balanced_accuracy": 0.5243985863327316,
+  "rows": 19448,
+  "symbol": "BNB_USDT",
+  "test_accuracy": 0.5202077334430275,
+  "test_balanced_accuracy": 0.5202077334430275,
+  "test_roc_auc": 0.5259025967801405,
+  "validation_accuracy": 0.519335316442712,
+  "validation_balanced_accuracy": 0.519335316442712,
+  "validation_roc_auc": 0.5300096532094983
+}

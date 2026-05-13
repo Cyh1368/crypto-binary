@@ -422,6 +422,33 @@ INDEX_HTML = """<!doctype html>
     .matrix table th:first-child {
       text-align: left;
     }
+    .matrix .axis-cell {
+      position: relative;
+      height: 58px;
+      min-width: 104px;
+      padding: 0;
+      background:
+        linear-gradient(to top right, transparent calc(50% - 1px), var(--line) 50%, transparent calc(50% + 1px)),
+        #f8fafc;
+      text-align: initial;
+    }
+    .matrix .axis-cell span {
+      position: absolute;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: #475569;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .matrix .axis-cell .axis-actual {
+      top: 10px;
+      right: 10px;
+    }
+    .matrix .axis-cell .axis-pred {
+      left: 10px;
+      bottom: 10px;
+    }
     .count-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -516,7 +543,7 @@ INDEX_HTML = """<!doctype html>
           <table>
             <thead>
               <tr>
-                <th>Pred / Actual</th>
+                <th class="axis-cell"><span class="axis-actual">ACTUAL</span><span class="axis-pred">PRED</span></th>
                 <th>UP</th>
                 <th>DOWN</th>
               </tr>

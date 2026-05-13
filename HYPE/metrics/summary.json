@@ -1,0 +1,15 @@
+{
+  "asset": "HYPE",
+  "best_test_regime": "volatility_regime=high",
+  "best_test_regime_balanced_accuracy": 0.5166041310710825,
+  "best_validation_regime": "session_europe=1",
+  "best_validation_regime_balanced_accuracy": 0.5152368092572818,
+  "rows": 17726,
+  "symbol": "HYPE_USDT",
+  "test_accuracy": 0.5106058896536162,
+  "test_balanced_accuracy": 0.5106058896536161,
+  "test_roc_auc": 0.510887954821809,
+  "validation_accuracy": 0.5130258260967633,
+  "validation_balanced_accuracy": 0.5130258260967633,
+  "validation_roc_auc": 0.5198586204725143
+}

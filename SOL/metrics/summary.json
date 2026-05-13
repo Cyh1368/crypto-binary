@@ -1,0 +1,15 @@
+{
+  "asset": "SOL",
+  "best_test_regime": "volatility_regime=medium",
+  "best_test_regime_balanced_accuracy": 0.5204272603150406,
+  "best_validation_regime": "session_europe=1",
+  "best_validation_regime_balanced_accuracy": 0.5273921966687956,
+  "rows": 19546,
+  "symbol": "SOL_USDT",
+  "test_accuracy": 0.5159623452368771,
+  "test_balanced_accuracy": 0.5159623452368771,
+  "test_roc_auc": 0.5263315227630793,
+  "validation_accuracy": 0.5226759696285656,
+  "validation_balanced_accuracy": 0.5226759696285656,
+  "validation_roc_auc": 0.5326756626311597
+}

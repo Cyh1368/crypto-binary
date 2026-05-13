@@ -21,6 +21,30 @@ The live script is now prediction-only: it fetches live Kraken Futures data, bui
 
 ![Balanced model confusion matrix](outputs/balanced_50_50/figures/validation_confusion_matrix.png)
 
+### Cross-Asset Balanced Model Comparison
+Separate balanced models were trained for ETH, SOL, XRP, HYPE, DOGE, and BNB using the same 43 BTC balanced feature columns, LightGBM architecture, walk-forward split settings, split-balancing procedure, and validation metric suite. Each non-BTC model has its own root folder with data, model artifacts, metrics, figures, and a detailed report:
+
+- `ETH/`
+- `SOL/`
+- `XRP/`
+- `HYPE/`
+- `DOGE/`
+- `BNB/`
+
+Performance summary, sorted by balanced test accuracy:
+
+| Asset | Test rows | Test balanced accuracy | Test ROC AUC | Validation balanced accuracy | Validation ROC AUC | Best test regime |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| BTC | 27,094 | 0.5476 | 0.5678 | 0.5467 | 0.5731 | Europe session inactive |
+| ETH | 19,788 | 0.5303 | 0.5381 | 0.5387 | 0.5472 | Low volatility |
+| DOGE | 19,414 | 0.5276 | 0.5397 | 0.5367 | 0.5530 | Europe session active |
+| BNB | 19,448 | 0.5202 | 0.5259 | 0.5193 | 0.5300 | Low volatility |
+| XRP | 19,468 | 0.5177 | 0.5310 | 0.5292 | 0.5391 | US session inactive |
+| SOL | 19,546 | 0.5160 | 0.5263 | 0.5227 | 0.5327 | Medium volatility |
+| HYPE | 17,726 | 0.5106 | 0.5109 | 0.5130 | 0.5199 | High volatility |
+
+BTC remains the strongest model overall. Among the six new non-BTC models, ETH has the best balanced test accuracy, while DOGE has the best non-BTC validation ROC AUC. HYPE is the weakest and has a shorter usable history because Kraken Futures returned no HYPE OHLCV rows; that model uses Binance Vision OHLCV/depth plus Kraken funding history.
+
 ## Progress: May 13, 2026
 - Implemented live prediction and web hosting
 - Side note: I have previously tried to predict the actual BTC price in 15 minutes. A contamination of validation data tricked me into thinking that it worked, which it didn't at all. After some research, I have found predicting direction to be more feasible; XGBoost and LightGBM are the best lightweight models for this task, so I chose the latter. 

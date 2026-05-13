@@ -1,0 +1,19 @@
+{
+  "accuracy": 0.5202077334430275,
+  "always_down_accuracy": 0.5,
+  "always_up_accuracy": 0.5,
+  "balanced_accuracy": 0.5202077334430275,
+  "down_ratio": 0.5,
+  "f1": 0.5464002722278937,
+  "information_coefficient": 0.030672731711550556,
+  "log_loss": 0.6922883144999514,
+  "mcc": 0.04068771084670143,
+  "mutual_information": 0.001622114192869839,
+  "pearson_corr": 0.0038693659756931977,
+  "precision": 0.5181156080022126,
+  "recall": 0.5779514603044015,
+  "roc_auc": 0.5259025967801405,
+  "rows": 19448,
+  "spearman_corr": 0.030672731711550556,
+  "up_ratio": 0.5
+}

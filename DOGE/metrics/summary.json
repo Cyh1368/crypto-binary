@@ -1,0 +1,15 @@
+{
+  "asset": "DOGE",
+  "best_test_regime": "session_europe=1",
+  "best_test_regime_balanced_accuracy": 0.5346593890911153,
+  "best_validation_regime": "volatility_regime=medium",
+  "best_validation_regime_balanced_accuracy": 0.5578654188948307,
+  "rows": 19414,
+  "symbol": "DOGE_USDT",
+  "test_accuracy": 0.5276089420006181,
+  "test_balanced_accuracy": 0.527608942000618,
+  "test_roc_auc": 0.53972605754924,
+  "validation_accuracy": 0.53665568369028,
+  "validation_balanced_accuracy": 0.53665568369028,
+  "validation_roc_auc": 0.5530288473608288
+}

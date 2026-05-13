@@ -1,0 +1,15 @@
+{
+  "asset": "XRP",
+  "best_test_regime": "session_us=0",
+  "best_test_regime_balanced_accuracy": 0.524588316436482,
+  "best_validation_regime": "volatility_regime=medium",
+  "best_validation_regime_balanced_accuracy": 0.5339632376861988,
+  "rows": 19468,
+  "symbol": "XRP_USDT",
+  "test_accuracy": 0.5176700226011917,
+  "test_balanced_accuracy": 0.5176700226011917,
+  "test_roc_auc": 0.5309605550798983,
+  "validation_accuracy": 0.5292211132832596,
+  "validation_balanced_accuracy": 0.5292211132832596,
+  "validation_roc_auc": 0.5391201105843204
+}

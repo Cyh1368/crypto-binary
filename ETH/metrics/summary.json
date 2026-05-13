@@ -1,0 +1,15 @@
+{
+  "asset": "ETH",
+  "best_test_regime": "volatility_regime=low",
+  "best_test_regime_balanced_accuracy": 0.5386570048165265,
+  "best_validation_regime": "volatility_regime=low",
+  "best_validation_regime_balanced_accuracy": 0.5446200317255876,
+  "rows": 19788,
+  "symbol": "ETH_USDT",
+  "test_accuracy": 0.530270871235092,
+  "test_balanced_accuracy": 0.530270871235092,
+  "test_roc_auc": 0.5380711507207856,
+  "validation_accuracy": 0.5386949924127465,
+  "validation_balanced_accuracy": 0.5386949924127465,
+  "validation_roc_auc": 0.5472303825812729
+}
