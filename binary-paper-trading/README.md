@@ -18,6 +18,14 @@ binary-venv/bin/python binary-paper-trading/run_live_paper_trading.py --once
 binary-venv/bin/python binary-paper-trading/run_live_paper_trading.py
 ```
 
+## Run Dashboard
+
+```bash
+binary-venv/bin/python binary-paper-trading/serve_paper_trading_dashboard.py
+```
+
+Then open `http://127.0.0.1:8080`.
+
 ## Logs
 
 Outputs are written under `binary-paper-trading/logs/`:
@@ -28,4 +36,3 @@ Outputs are written under `binary-paper-trading/logs/`:
 - `feature_snapshots.jsonl`: complete feature dictionary per cycle
 - `paper_positions.csv`: simulated position/equity state per cycle
 - `state.json`: latest paper account state for restart continuity
-

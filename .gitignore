@@ -14,6 +14,7 @@ outputs/predictions/*
 outputs/metrics/*
 outputs/figures/*
 !outputs/models/.gitkeep
+!outputs/models/lightgbm_model.pkl
 !outputs/predictions/.gitkeep
 !outputs/metrics/.gitkeep
 !outputs/figures/.gitkeep

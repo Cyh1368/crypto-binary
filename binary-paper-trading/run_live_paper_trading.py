@@ -262,6 +262,7 @@ class LivePaperTrader:
         prediction: dict[str, Any],
         position_row: dict[str, Any],
     ) -> None:
+        contract_ts = ts + pd.Timedelta(minutes=15)
         raw = frame.loc[ts]
         bids = raw.get("bids", [])
         asks = raw.get("asks", [])
@@ -287,7 +288,8 @@ class LivePaperTrader:
         )
 
         prediction_row = {
-            "timestamp": ts.isoformat(),
+            "timestamp": contract_ts.isoformat(),
+            "model_input_timestamp": contract_ts.isoformat(),
             "close": raw["close"],
             "direction": prediction["direction"],
             "prob_up": prediction["prob_up"],
@@ -316,8 +318,10 @@ class LivePaperTrader:
             f.write(json.dumps(feature_payload, default=json_default, sort_keys=True) + "\n")
 
         self.logger.info(
-            "BTC %s | close=%.2f | p_up=%.2f%% p_down=%.2f%% | signal=%s | action=%s | equity=%.2f",
+            "BTC %s | contract=%s | model_input_candle_close=%s | model_input_close=%.2f | p_up=%.2f%% p_down=%.2f%% | signal=%s | action=%s | equity=%.2f",
             prediction["direction"],
+            contract_ts.isoformat(),
+            contract_ts.isoformat(),
             raw["close"],
             prediction["up_percent"],
             prediction["down_percent"],
@@ -362,7 +366,8 @@ class LivePaperTrader:
         for idx, row in predictions.iterrows():
             if str(row.get("actual_direction_15m", "")).strip() not in {"", "nan", "NaN"}:
                 continue
-            target_ts = row["timestamp"] + pd.Timedelta(minutes=15)
+            has_model_input_ts = str(row.get("model_input_timestamp", "")).strip() not in {"", "nan", "NaN"}
+            target_ts = row["timestamp"] if has_model_input_ts else row["timestamp"] + pd.Timedelta(minutes=15)
             if target_ts not in frame.index:
                 continue
             start_close = float(row["close"])
@@ -380,6 +385,7 @@ class LivePaperTrader:
             updates.append(
                 {
                     "prediction_timestamp": row["timestamp"].isoformat(),
+                    "model_input_timestamp": row.get("model_input_timestamp", ""),
                     "target_timestamp": target_ts.isoformat(),
                     "predicted_direction": row["direction"],
                     "prob_up": row["prob_up"],
@@ -413,12 +419,14 @@ class LivePaperTrader:
         frame = self.fetch_market_frame()
         self.evaluate_pending_predictions(frame)
         ts, latest_features, model_row = self.build_live_features(frame)
+        contract_ts = ts + pd.Timedelta(minutes=15)
         prediction = self.predict(model_row)
         price = float(frame.loc[ts, "close"])
-        position_row = self.update_paper_position(ts, price, prediction)
+        position_row = self.update_paper_position(contract_ts, price, prediction)
         self.log_cycle(ts, frame, latest_features, prediction, position_row)
         return {
-            "timestamp": ts.isoformat(),
+            "timestamp": contract_ts.isoformat(),
+            "model_input_timestamp": contract_ts.isoformat(),
             "close": price,
             "prediction": prediction,
             "position": position_row,
