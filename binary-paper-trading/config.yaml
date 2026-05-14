@@ -1,5 +1,5 @@
 symbol: BTC/USD:USD
-model_path: outputs/balanced_50_50/models/lightgbm_model.pkl
+model_path: outputs/optuned-balanced/models/lightgbm_model.pkl
 logs_dir: binary-paper-trading/logs
 timeframe: 15m
 history_bars: 500

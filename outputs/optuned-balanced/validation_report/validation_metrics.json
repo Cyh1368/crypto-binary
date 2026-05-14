@@ -1,0 +1,39 @@
+{
+  "rows": 27342,
+  "start": "2025-04-12 00:30:00+00:00",
+  "end": "2026-04-01 04:15:00+00:00",
+  "folds": 17,
+  "positive_rate_actual": 0.5,
+  "positive_rate_predicted": 0.612866652037159,
+  "accuracy": 0.5510204081632653,
+  "balanced_accuracy": 0.5510204081632653,
+  "precision_up": 0.5416243957749001,
+  "recall_up": 0.6638870602004242,
+  "f1_up": 0.5965558038648613,
+  "mcc": 0.1047443585736091,
+  "roc_auc": 0.5765023545872172,
+  "average_precision": 0.5632261431687254,
+  "log_loss": 0.6811434471086109,
+  "brier_score": 0.24417243187808113,
+  "pearson_prob_return": 0.02834014415169662,
+  "spearman_prob_return": 0.05510273485631903,
+  "confusion_matrix_down_up": [
+    [
+      5990,
+      7681
+    ],
+    [
+      4595,
+      9076
+    ]
+  ],
+  "binomial_accuracy_p_value_gt_50": 3.08040534992663e-64,
+  "avg_confidence": 0.5513197489505611,
+  "median_confidence": 0.5343017441826694,
+  "avg_gross_return_bps_per_signal": 0.7902041637404831,
+  "avg_net_return_bps_per_signal_assuming_3bps": -2.2097958362595165,
+  "gross_total_log_return_pct": 216.0576224499229,
+  "net_total_log_return_pct_assuming_3bps": -604.202377550077,
+  "gross_hit_rate": 0.4447736083680784,
+  "profit_factor_gross": 1.1083515129304085
+}

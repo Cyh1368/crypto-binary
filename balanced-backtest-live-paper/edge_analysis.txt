@@ -1,0 +1,33 @@
+Balanced live paper backtest edge analysis
+rows: 41
+start: 2026-05-13T18:30:00+00:00
+end: 2026-05-14T04:15:00+00:00
+accuracy: 0.5609756097560976
+up_predictions: 22
+down_predictions: 19
+actual_up: 18
+actual_down: 23
+avg_confidence: 51.52574079809267
+avg_gross_return_bps: 1.8964761152676437
+avg_net_return_bps: -1.103523884732356
+total_gross_return_pct: 0.7775552072597339
+total_net_return_pct: -0.452444792740266
+win_rate_gross: 0.5609756097560976
+payoff_avg_win_bps: 10.674937906432502
+payoff_avg_loss_bps: -9.32044728455412
+
+Confidence bins
+                 n  accuracy  avg_gross_bps  avg_net_bps
+confidence_bin                                          
+(49.999, 51.0]  13  0.307692      -4.313395    -7.313395
+(51.0, 52.0]    18  0.611111       5.105421     2.105421
+(52.0, 53.0]     7  0.714286       0.547256    -2.452744
+(53.0, 55.0]     2  1.000000       5.149281     2.149281
+(55.0, 60.0]     1  1.000000      27.802720    24.802720
+(60.0, 100.0]    0       NaN            NaN          NaN
+
+Direction
+            n  accuracy  avg_gross_bps  total_gross_pct
+direction                                              
+DOWN       19  0.631579       3.339982         0.634596
+UP         22  0.500000       0.649812         0.142959
