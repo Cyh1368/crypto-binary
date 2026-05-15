@@ -1,1 +1,0 @@
-prediction_timestamp,model_input_timestamp,target_timestamp,predicted_direction,prob_up,prob_down,start_close,actual_close_15m,actual_return_15m,actual_direction_15m,prediction_correct,evaluated_at

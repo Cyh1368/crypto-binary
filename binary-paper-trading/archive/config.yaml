@@ -1,0 +1,14 @@
+symbol: BTC/USD:USD
+model_name: obi-optuna-500
+model_path: outputs/obi-optuna-500/models/lightgbm_model.pkl
+logs_dir: binary-paper-trading/logs
+timeframe: 15m
+history_bars: 500
+orderbook_limit: 50
+obi_backfill:
+  binance_symbol: BTCUSDT
+  min_history_snapshots: 60
+loop:
+  seconds_after_boundary: 10
+  retry_attempts: 3
+  retry_sleep_seconds: 5

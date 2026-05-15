@@ -85,6 +85,8 @@ class DashboardConfig:
     model_path: str
     timeframe: str
     seconds_after_boundary: int
+    uses_obi_backfill: bool
+    obi_required_snapshots: int
     poll_seconds: int
     live_price_seconds: int
 
@@ -99,6 +101,7 @@ def build_config(config_path: Path, logs_dir: Path | None, poll_seconds: int, li
         resolved_logs_dir = DEFAULT_LOGS_DIR
 
     loop_config = config.get("loop") or {}
+    obi_config = config.get("obi_backfill") or {}
     seconds_after_boundary = int(loop_config.get("seconds_after_boundary", 0))
     return DashboardConfig(
         logs_dir=resolved_logs_dir,
@@ -107,6 +110,8 @@ def build_config(config_path: Path, logs_dir: Path | None, poll_seconds: int, li
         model_path=str(config.get("model_path", "")),
         timeframe=str(config.get("timeframe", "15m")),
         seconds_after_boundary=seconds_after_boundary,
+        uses_obi_backfill="obi_backfill" in config,
+        obi_required_snapshots=int(obi_config.get("min_history_snapshots", 60)),
         poll_seconds=poll_seconds,
         live_price_seconds=live_price_seconds,
     )
@@ -209,6 +214,65 @@ def confusion_matrix(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
     return matrix
 
 
+def read_latest_obi_warning(logs_dir: Path) -> str | None:
+    path = logs_dir / "paper_trading.log"
+    if not path.exists():
+        return None
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines[-300:]):
+        if "[WARNING]" not in line:
+            continue
+        if "OBI" in line or "bookDepth" in line or "Binance Vision" in line:
+            return line
+    return None
+
+
+def read_obi_status(logs_dir: Path, required_snapshots: int, uses_obi_backfill: bool) -> dict[str, Any]:
+    if not uses_obi_backfill:
+        return {
+            "state": "not_required",
+            "required_snapshots": 0,
+            "snapshot_count": 0,
+            "continuous_snapshots": 0,
+            "remaining_ticks": 0,
+            "last_obi_timestamp": None,
+            "last_warning": None,
+        }
+
+    path = logs_dir / "live_obi_history.csv"
+    timestamps: list[datetime] = []
+    if path.exists():
+        with path.open("r", encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                ts = parse_timestamp(row.get("timestamp", ""))
+                if ts is not None:
+                    timestamps.append(ts)
+
+    unique = sorted(set(timestamps))
+    continuous_tail = 0
+    if unique:
+        expected = unique[-1]
+        available = set(unique)
+        while expected in available:
+            continuous_tail += 1
+            expected -= timedelta(minutes=15)
+
+    ready = continuous_tail >= required_snapshots
+    remaining = max(0, required_snapshots - continuous_tail)
+    return {
+        "state": "ready" if ready else "warming_up",
+        "required_snapshots": required_snapshots,
+        "snapshot_count": len(unique),
+        "continuous_snapshots": continuous_tail,
+        "remaining_ticks": remaining,
+        "last_obi_timestamp": unique[-1].isoformat() if unique else None,
+        "last_warning": read_latest_obi_warning(logs_dir),
+    }
+
+
 def next_prediction_time(now: datetime, seconds_after_boundary: int) -> datetime:
     boundary = now.replace(second=0, microsecond=0)
     next_minute = (now.minute // 15 + 1) * 15
@@ -231,6 +295,7 @@ def dashboard_payload(config: DashboardConfig) -> dict[str, Any]:
     current = serialized[-1] if serialized else None
     now = utc_now()
     next_prediction = next_prediction_time(now, config.seconds_after_boundary)
+    prediction_status = read_obi_status(config.logs_dir, config.obi_required_snapshots, config.uses_obi_backfill)
     return {
         "generated_at": now.isoformat(),
         "logs_dir": str(config.logs_dir),
@@ -239,6 +304,7 @@ def dashboard_payload(config: DashboardConfig) -> dict[str, Any]:
         "current": current,
         "history": list(reversed(serialized)),
         "confusion_matrix": confusion_matrix(evaluated),
+        "prediction_status": prediction_status,
         "counts": {
             "contracts": len(rows),
             "evaluated": len(evaluated),
@@ -332,6 +398,8 @@ INDEX_HTML = """<!doctype html>
       --red-bg: #fee2e2;
       --red-text: #991b1b;
       --pending-bg: #eef2f7;
+      --warn-bg: #fff7ed;
+      --warn-text: #9a3412;
     }
     * { box-sizing: border-box; }
     body {
@@ -439,6 +507,11 @@ INDEX_HTML = """<!doctype html>
     tr.correct td { background: var(--green-bg); color: var(--green-text); }
     tr.wrong td { background: var(--red-bg); color: var(--red-text); }
     tr.pending td { background: var(--pending-bg); }
+    .metric.warning {
+      background: var(--warn-bg);
+      color: var(--warn-text);
+      border-color: #fed7aa;
+    }
     .matrix {
       padding: 16px;
     }
@@ -523,7 +596,7 @@ INDEX_HTML = """<!doctype html>
       <div class="metric panel">
         <div class="label">Prediction</div>
         <div class="value" id="current-direction">-</div>
-        <div class="subtle">Predicted direction</div>
+        <div class="subtle" id="prediction-status">Predicted direction</div>
       </div>
       <div class="metric panel">
         <div class="label">Probability</div>
@@ -648,14 +721,31 @@ INDEX_HTML = """<!doctype html>
       scheduleRefresh(data.poll_seconds || 5);
 
       const current = data.current;
+      const status = data.prediction_status || {};
+      const warmingUp = status.state === "warming_up";
       text("model-name", data.model_name || "-");
       text("model-path", data.model_path || "-");
-      text("current-ts", current ? formatTime(current.timestamp) : "-");
-      text("current-direction", current?.predicted_direction || "-");
-      text("current-probability", current ? pct(current.probability) : "-");
-      text("current-price", current ? usd(current.model_input_price) : "-");
-      text("price-source", current?.model_input_timestamp ? `Candle close ${formatTime(current.model_input_timestamp)}` : "Model input candle close");
-      text("last-updated", `Dashboard refreshed ${formatTime(data.generated_at)}`);
+      document.getElementById("current-direction").closest(".metric").classList.toggle("warning", warmingUp);
+      if (warmingUp) {
+        text("current-ts", "No active prediction");
+        text("current-direction", "WARMUP");
+        text("prediction-status", `${status.remaining_ticks || 0} ticks remaining`);
+        text("current-probability", "-");
+        text("current-price", current ? usd(current.model_input_price) : "-");
+        text(
+          "price-source",
+          `OBI window ${status.continuous_snapshots || 0}/${status.required_snapshots || 60}; ${status.remaining_ticks || 0} ticks remaining; no CSV prediction row is written`
+        );
+        text("last-updated", status.last_warning || `Dashboard refreshed ${formatTime(data.generated_at)}`);
+      } else {
+        text("current-ts", current ? formatTime(current.timestamp) : "-");
+        text("current-direction", current?.predicted_direction || "-");
+        text("prediction-status", "Predicted direction");
+        text("current-probability", current ? pct(current.probability) : "-");
+        text("current-price", current ? usd(current.model_input_price) : "-");
+        text("price-source", current?.model_input_timestamp ? `Candle close ${formatTime(current.model_input_timestamp)}` : "Model input candle close");
+        text("last-updated", `Dashboard refreshed ${formatTime(data.generated_at)}`);
+      }
       text("next-at", nextPredictionAt ? formatTime(nextPredictionAt.toISOString()) : "-");
 
       const body = document.getElementById("history-body");

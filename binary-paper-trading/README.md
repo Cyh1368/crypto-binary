@@ -2,7 +2,10 @@
 
 BTC-only live predictor for the trained LightGBM direction model.
 
-The live paper-trading server is currently configured to run the `obi-optuna-500` model from `outputs/obi-optuna-500/models/lightgbm_model.pkl`.
+The model-specific live paper-trading entrypoints are:
+
+- `obi-optuna-500`: `run_live_obi_optuna_500.py`, dashboard `serve_dashboard_obi_optuna_500.py`, config `config_obi_optuna_500.yaml`, logs `logs_obi_optuna_500/`, dashboard port `8097`.
+- `optuned-balanced`: `run_live_optuned_balanced.py`, dashboard `serve_dashboard_optuned_balanced.py`, config `config_optuned_balanced.yaml`, logs `logs_optuned_balanced/`, dashboard port `8098`.
 
 It wakes up on 15-minute boundaries, fetches real Kraken Futures data, computes live features, predicts the probability that BTC will be up over the next 15-minute bar, and records every cycle.
 
@@ -11,28 +14,34 @@ No orders are sent to an exchange, and no simulated long/short positions are ope
 ## Run Once
 
 ```bash
-binary-venv/bin/python binary-paper-trading/run_live_paper_trading.py --once
+binary-venv/bin/python binary-paper-trading/run_live_obi_optuna_500.py --once
+binary-venv/bin/python binary-paper-trading/run_live_optuned_balanced.py --once
 ```
 
 ## Run Continuously
 
 ```bash
-binary-venv/bin/python binary-paper-trading/run_live_paper_trading.py
+binary-venv/bin/python binary-paper-trading/run_live_obi_optuna_500.py
+binary-venv/bin/python binary-paper-trading/run_live_optuned_balanced.py
 ```
 
 ## Run Dashboard
 
 ```bash
-binary-venv/bin/python binary-paper-trading/serve_paper_trading_dashboard.py
+binary-venv/bin/python binary-paper-trading/serve_dashboard_obi_optuna_500.py
+binary-venv/bin/python binary-paper-trading/serve_dashboard_optuned_balanced.py
 ```
 
-Then open `http://127.0.0.1:8097`.
+Then open:
 
-The current dashboard server is running at `http://127.0.0.1:8097` and displays the active model name at the top of the page.
+- `http://127.0.0.1:8097` for `obi-optuna-500`
+- `http://127.0.0.1:8098` for `optuned-balanced`
+
+Each dashboard displays the active model name at the top of the page. The OBI dashboard reports OBI warmup progress when the rolling OBI window is incomplete. The `optuned-balanced` model has no OBI features, so it does not require OBI warmup.
 
 ## Logs
 
-Outputs are written under `binary-paper-trading/logs/`:
+Outputs are written under each model's configured logs directory:
 
 - `paper_trading.log`: human-readable runtime log
 - `predictions.csv`: one row per 15-minute prediction

@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from src.data.download_binance import build_bids_asks_from_depth, download_binance_vision_depth
 from src.features.derivatives import add_derivatives_features
 from src.features.orderflow import add_orderflow_features
 from src.features.regime import add_regime_features
@@ -31,7 +32,12 @@ from src.features.volatility import add_volatility_regimes
 
 PRICE_WINDOWS = [1, 3, 5, 15, 30, 60]
 ORDERBOOK_LEVELS = [5, 10, 20, 50]
+REALIZED_VOL_WINDOW = 60
+REALIZED_VOL_PERCENTILE_WINDOW = 240
+LIVE_MARKET_HISTORY_BARS = REALIZED_VOL_WINDOW + REALIZED_VOL_PERCENTILE_WINDOW
+TIMEFRAME_MINUTES = 15
 LIVE_OBI_HISTORY_BARS = 60
+LIVE_OBI_REQUIRED_PRIOR_SNAPSHOTS = LIVE_OBI_HISTORY_BARS - 1
 LIVE_OBI_HISTORY_COLUMNS = [
     "timestamp",
     "obi_raw_5",
@@ -41,6 +47,10 @@ LIVE_OBI_HISTORY_COLUMNS = [
     "bid_ask_depth_ratio_10",
     "bid_ask_depth_ratio_20",
 ]
+
+
+class WarmupNotReady(RuntimeError):
+    pass
 
 
 def utc_now() -> datetime:
@@ -111,6 +121,7 @@ class LivePaperTrader:
         self.models = artifact["models"]
         self.feature_cols = artifact["feature_cols"]
         self._validate_model_features()
+        self._validate_history_config()
 
     def _validate_model_features(self) -> None:
         if not self.feature_cols:
@@ -121,6 +132,21 @@ class LivePaperTrader:
                 raise RuntimeError(
                     f"Model fold {idx} feature order does not match artifact feature_cols; refusing live prediction"
                 )
+
+    def _validate_history_config(self) -> None:
+        history_bars = int(self.config["history_bars"])
+        if history_bars < LIVE_MARKET_HISTORY_BARS:
+            raise RuntimeError(
+                f"history_bars={history_bars} is too short for live feature warmup; "
+                f"need at least {LIVE_MARKET_HISTORY_BARS} closed OHLCV/funding bars"
+            )
+        obi_config = self.config.get("obi_backfill") or {}
+        min_history_snapshots = int(obi_config.get("min_history_snapshots", LIVE_OBI_HISTORY_BARS))
+        if min_history_snapshots < LIVE_OBI_HISTORY_BARS:
+            raise RuntimeError(
+                f"obi_backfill.min_history_snapshots={min_history_snapshots} is too short; "
+                f"need at least {LIVE_OBI_HISTORY_BARS}"
+            )
 
     def _obi_history_path(self) -> Path:
         return self.logs_dir / "live_obi_history.csv"
@@ -145,11 +171,8 @@ class LivePaperTrader:
         out["timestamp"] = out["timestamp"].map(lambda value: pd.Timestamp(value).isoformat())
         out.to_csv(path, index=False)
 
-    def _apply_live_obi_history(self, latest_ts: pd.Timestamp, latest_features: pd.Series) -> pd.Series:
-        if not any(col.startswith("obi_") or col.startswith("bid_ask_depth_ratio_") for col in self.feature_cols):
-            return latest_features
-
-        snapshot: dict[str, Any] = {"timestamp": latest_ts}
+    def _snapshot_from_features(self, ts: pd.Timestamp, latest_features: pd.Series) -> dict[str, Any]:
+        snapshot: dict[str, Any] = {"timestamp": ts}
         missing = []
         for col in LIVE_OBI_HISTORY_COLUMNS[1:]:
             value = latest_features.get(col)
@@ -159,12 +182,90 @@ class LivePaperTrader:
                 snapshot[col] = float(value)
         if missing:
             raise RuntimeError(f"Live order book snapshot is missing OBI inputs: {', '.join(missing)}")
+        return snapshot
 
+    def _history_covers_latest(self, history: pd.DataFrame, latest_ts: pd.Timestamp) -> bool:
+        history = history[history["timestamp"] < latest_ts].tail(LIVE_OBI_REQUIRED_PRIOR_SNAPSHOTS)
+        if len(history) < LIVE_OBI_REQUIRED_PRIOR_SNAPSHOTS:
+            return False
+        expected = pd.date_range(
+            end=latest_ts - pd.Timedelta(minutes=TIMEFRAME_MINUTES),
+            periods=LIVE_OBI_REQUIRED_PRIOR_SNAPSHOTS,
+            freq=f"{TIMEFRAME_MINUTES}min",
+            tz="UTC",
+        )
+        actual = pd.DatetimeIndex(history["timestamp"])
+        return expected.difference(actual).empty
+
+    def _backfill_obi_history(self, features: pd.DataFrame, latest_ts: pd.Timestamp) -> pd.DataFrame:
+        obi_config = self.config.get("obi_backfill") or {}
+        binance_symbol = str(obi_config.get("binance_symbol", "BTCUSDT"))
+        min_history_snapshots = int(obi_config.get("min_history_snapshots", LIVE_OBI_HISTORY_BARS))
+        historical = features.loc[features.index < latest_ts].tail(min_history_snapshots).copy()
+        if len(historical) < min_history_snapshots:
+            raise WarmupNotReady(
+                f"Only {len(historical)}/{min_history_snapshots} closed bars available for historical OBI backfill"
+            )
+
+        lookback_start = historical.index[0]
+        lookback_end = historical.index[-1]
+        depth = download_binance_vision_depth(lookback_start, lookback_end, binance_symbol=binance_symbol)
+        if depth.empty:
+            raise WarmupNotReady(
+                f"No Binance Vision bookDepth backfill available for {binance_symbol} "
+                f"from {lookback_start.isoformat()} to {lookback_end.isoformat()}"
+            )
+
+        with_books = build_bids_asks_from_depth(historical, depth)
+        if len(with_books) < min_history_snapshots:
+            raise WarmupNotReady(
+                f"Only {len(with_books)}/{min_history_snapshots} historical OBI snapshots available "
+                f"from Binance Vision for {binance_symbol}"
+            )
+
+        backfill_features = add_orderflow_features(with_books.tail(min_history_snapshots), ORDERBOOK_LEVELS)
+        history_rows = []
+        for ts, row in backfill_features.iterrows():
+            history_rows.append(self._snapshot_from_features(ts, row))
+        history = pd.DataFrame(history_rows)
+        self._save_obi_history(history)
+        self.logger.info(
+            "Backfilled %s OBI snapshots from Binance Vision %s through %s",
+            len(history),
+            binance_symbol,
+            pd.Timestamp(history["timestamp"].iloc[-1]).isoformat(),
+        )
+        return history
+
+    def _apply_live_obi_history(
+        self,
+        features: pd.DataFrame,
+        latest_ts: pd.Timestamp,
+        latest_features: pd.Series,
+    ) -> pd.Series:
+        if not any(col.startswith("obi_") or col.startswith("bid_ask_depth_ratio_") for col in self.feature_cols):
+            return latest_features
+
+        snapshot = self._snapshot_from_features(latest_ts, latest_features)
         history = self._load_obi_history()
+        history = history[history["timestamp"] < latest_ts]
+        if not self._history_covers_latest(history, latest_ts):
+            try:
+                history = self._backfill_obi_history(features, latest_ts)
+            except WarmupNotReady:
+                fallback_history = pd.concat([history, pd.DataFrame([snapshot])], ignore_index=True)
+                fallback_history = fallback_history.sort_values("timestamp").tail(LIVE_OBI_HISTORY_BARS)
+                self._save_obi_history(fallback_history)
+                raise
         history = history[history["timestamp"] != latest_ts]
         history = pd.concat([history, pd.DataFrame([snapshot])], ignore_index=True)
         history = history.sort_values("timestamp").tail(LIVE_OBI_HISTORY_BARS)
         self._save_obi_history(history)
+        if len(history) < LIVE_OBI_HISTORY_BARS:
+            raise WarmupNotReady(
+                "Live OBI history has "
+                f"{len(history)}/{LIVE_OBI_HISTORY_BARS} snapshots; collecting history before predicting"
+            )
 
         raw_5 = history["obi_raw_5"].astype(float)
         raw_10 = history["obi_raw_10"].astype(float)
@@ -179,14 +280,8 @@ class LivePaperTrader:
             latest_features[f"obi_rolling_std_{window}"] = float(values.std()) if len(values) > 1 else 0.0
 
         z_values = raw_5.tail(LIVE_OBI_HISTORY_BARS)
-        z_std = float(z_values.std()) if len(z_values) > 1 else 0.0
+        z_std = float(z_values.std())
         latest_features["obi_zscore_5"] = float((raw_5.iloc[-1] - z_values.mean()) / (z_std + 1e-8)) if z_std else 0.0
-        if len(history) < LIVE_OBI_HISTORY_BARS:
-            self.logger.warning(
-                "Live OBI history has %s/%s snapshots; using available history for rolling OBI inputs",
-                len(history),
-                LIVE_OBI_HISTORY_BARS,
-            )
         return latest_features
 
     def fetch_market_frame(self) -> pd.DataFrame:
@@ -202,8 +297,8 @@ class LivePaperTrader:
                     limit=int(self.config["history_bars"]),
                 )
                 orderbook = self.exchange.fetch_order_book(symbol, limit=int(self.config["orderbook_limit"]))
-                funding = self.exchange.fetch_funding_rate(symbol)
-                return self._build_market_frame(ohlcv, orderbook, funding)
+                funding_history = self.fetch_funding_history(symbol, ohlcv)
+                return self._build_market_frame(ohlcv, orderbook, funding_history)
             except Exception as exc:
                 last_error = exc
                 self.logger.warning("Fetch attempt %s/%s failed: %s", attempt, retry_attempts, exc)
@@ -211,7 +306,32 @@ class LivePaperTrader:
                     time.sleep(retry_sleep)
         raise RuntimeError(f"Failed to fetch live market data after {retry_attempts} attempts: {last_error}")
 
-    def _build_market_frame(self, ohlcv: list[list[float]], orderbook: dict, funding: dict) -> pd.DataFrame:
+    def fetch_funding_history(self, symbol: str, ohlcv: list[list[float]]) -> list[dict[str, Any]]:
+        if not ohlcv:
+            raise RuntimeError("Cannot fetch funding history without OHLCV timestamps")
+        since_funding = int(min(row[0] for row in ohlcv))
+        end_ms = int(max(row[0] for row in ohlcv))
+        funding_rows: list[dict[str, Any]] = []
+        while since_funding <= end_ms:
+            batch = self.exchange.fetch_funding_rate_history(symbol, since=since_funding, limit=1000)
+            if not batch:
+                break
+            funding_rows.extend(batch)
+            next_since = int(batch[-1]["timestamp"]) + 1
+            if next_since <= since_funding:
+                break
+            since_funding = next_since
+            time.sleep(0.05)
+        if not funding_rows:
+            raise RuntimeError(f"No funding-rate history returned for {symbol}; refusing live prediction")
+        return funding_rows
+
+    def _build_market_frame(
+        self,
+        ohlcv: list[list[float]],
+        orderbook: dict,
+        funding_history: list[dict[str, Any]],
+    ) -> pd.DataFrame:
         df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
         df = df.drop_duplicates("timestamp").set_index("timestamp").sort_index()
@@ -221,15 +341,25 @@ class LivePaperTrader:
             df = df.iloc[:-1].copy()
         if df.empty:
             raise RuntimeError("No closed OHLCV bars available")
+        if len(df) < LIVE_MARKET_HISTORY_BARS:
+            raise WarmupNotReady(
+                f"Only {len(df)}/{LIVE_MARKET_HISTORY_BARS} closed OHLCV bars available; "
+                "collecting history before predicting"
+            )
 
         df["bids"] = [[] for _ in range(len(df))]
         df["asks"] = [[] for _ in range(len(df))]
-        df["funding_rate"] = np.nan
         last_idx = df.index[-1]
         df.at[last_idx, "bids"] = [[float(p), float(q)] for p, q in orderbook.get("bids", [])]
         df.at[last_idx, "asks"] = [[float(p), float(q)] for p, q in orderbook.get("asks", [])]
-        df.at[last_idx, "funding_rate"] = float(funding.get("fundingRate") or 0.0)
-        df["funding_rate"] = df["funding_rate"].ffill().fillna(0.0)
+
+        funding = pd.DataFrame(funding_history)
+        funding["timestamp"] = pd.to_datetime(funding["timestamp"], unit="ms", utc=True)
+        funding = funding.drop_duplicates("timestamp").set_index("timestamp").sort_index()
+        funding_rates = pd.to_numeric(funding["fundingRate"], errors="coerce")
+        df["funding_rate"] = funding_rates.reindex(df.index, method="ffill").fillna(0.0)
+        if df["funding_rate"].nunique(dropna=True) <= 1:
+            raise RuntimeError("Funding-rate history is constant after alignment; refusing live prediction")
         return df
 
     def build_live_features(self, frame: pd.DataFrame) -> tuple[pd.Timestamp, pd.Series, pd.Series]:
@@ -241,7 +371,7 @@ class LivePaperTrader:
         features = add_volatility_regimes(features)
         latest_ts = features.index[-1]
         latest_features = features.loc[latest_ts].copy()
-        latest_features = self._apply_live_obi_history(latest_ts, latest_features)
+        latest_features = self._apply_live_obi_history(features, latest_ts, latest_features)
         model_row = latest_features.reindex(self.feature_cols).astype(float)
         missing = model_row[model_row.isna()]
         if not missing.empty:
@@ -303,7 +433,7 @@ class LivePaperTrader:
 
         prediction_row = {
             "timestamp": contract_ts.isoformat(),
-            "model_input_timestamp": contract_ts.isoformat(),
+            "model_input_timestamp": ts.isoformat(),
             "close": raw["close"],
             "direction": prediction["direction"],
             "prob_up": prediction["prob_up"],
@@ -332,7 +462,7 @@ class LivePaperTrader:
             "BTC %s | contract=%s | model_input_candle_close=%s | model_input_close=%.2f | p_up=%.2f%% p_down=%.2f%% | signal=%s",
             prediction["direction"],
             contract_ts.isoformat(),
-            contract_ts.isoformat(),
+            ts.isoformat(),
             raw["close"],
             prediction["up_percent"],
             prediction["down_percent"],
@@ -434,7 +564,7 @@ class LivePaperTrader:
         self.log_cycle(ts, frame, latest_features, prediction)
         return {
             "timestamp": contract_ts.isoformat(),
-            "model_input_timestamp": contract_ts.isoformat(),
+            "model_input_timestamp": ts.isoformat(),
             "close": price,
             "prediction": prediction,
         }
@@ -459,6 +589,10 @@ class LivePaperTrader:
             try:
                 result = self.step()
                 self.logger.info("Completed cycle: %s", json.dumps(result, default=json_default))
+            except WarmupNotReady as exc:
+                self.logger.warning("%s", exc)
+                if once:
+                    return
             except Exception:
                 self.logger.exception("Paper trading cycle failed")
                 if once:
