@@ -10,6 +10,20 @@ def _levels(levels: object, n: int) -> list[list[float]]:
     return [[float(price), float(size)] for price, size in levels[:n] if float(size) >= 0]
 
 
+def _levels_from_snapshot(levels: object, n: int) -> list[list[float]]:
+    if not isinstance(levels, (list, tuple, np.ndarray)):
+        return []
+    parsed = []
+    for level in list(levels)[:n]:
+        if not isinstance(level, (list, tuple, np.ndarray)) or len(level) < 2:
+            continue
+        price, size = level[0], level[1]
+        if pd.isna(price) or pd.isna(size) or float(size) < 0:
+            continue
+        parsed.append([float(price), float(size)])
+    return parsed
+
+
 def _sum_size(levels: list[list[float]]) -> float:
     return float(sum(size for _, size in levels))
 
@@ -70,4 +84,30 @@ def add_orderflow_features(df: pd.DataFrame, levels: list[int]) -> pd.DataFrame:
         out["volume_imbalance"] = np.nan
     out["trade_arrival_rate"] = out.get("trade_count", pd.Series(index=out.index, dtype=float))
     out["cancel_rate"] = np.nan
+
+    obi_levels = [5, 10, 20]
+    bid_volumes: dict[int, pd.Series] = {}
+    ask_volumes: dict[int, pd.Series] = {}
+    for n in obi_levels:
+        bid_levels = out["bids"].map(lambda bids, n=n: _levels_from_snapshot(bids, n))
+        ask_levels = out["asks"].map(lambda asks, n=n: _levels_from_snapshot(asks, n))
+        bid_volume = bid_levels.map(_sum_size)
+        ask_volume = ask_levels.map(_sum_size)
+        bid_volumes[n] = bid_volume
+        ask_volumes[n] = ask_volume
+        denom = bid_volume + ask_volume
+        out[f"obi_raw_{n}"] = (bid_volume - ask_volume) / denom.replace(0.0, np.nan)
+        out[f"bid_ask_depth_ratio_{n}"] = bid_volume / (ask_volume + 1e-8)
+
+    out["obi_delta_5"] = out["obi_raw_5"].diff()
+    out["obi_delta_10"] = out["obi_raw_10"].diff()
+    out["obi_pressure_ratio"] = out["obi_raw_5"] / (out["obi_raw_20"] + 1e-8)
+
+    for window in [3, 5, 15]:
+        out[f"obi_rolling_mean_{window}"] = out["obi_raw_5"].rolling(window).mean()
+        out[f"obi_rolling_std_{window}"] = out["obi_raw_5"].rolling(window).std()
+
+    rolling_mean = out["obi_raw_5"].rolling(60).mean()
+    rolling_std = out["obi_raw_5"].rolling(60).std()
+    out["obi_zscore_5"] = (out["obi_raw_5"] - rolling_mean) / (rolling_std + 1e-8)
     return out
