@@ -1,391 +1,68 @@
-# BTC 15-Minute Direction Prediction System
+# 15-Minute BTC Futures Direction Prediction with LightGBM
 
-### Codex Fix: Feature Order
-Fixed a live-inference artifact bug where the saved model feature list was derived from aggregated feature importance, which reordered the model inputs relative to training. The pipeline now preserves the original trained feature order when saving `outputs/models/lightgbm_model.pkl`, preventing live predictions from feeding LightGBM columns in the wrong order.
+I trained several `LightGBM` models to predict whether BTC would go up or down in 15 minutes, which has tradable markets in [Kalshi](https://kalshi.com/category/crypto/frequency/fifteen_min) and [Polymarket](https://polymarket.com/crypto/15M). 
+The latest model, [optuned-balanced](/outputs/optuned-balanced/) is trained on 50,000 15-minute bars as a 17-fold walk-forward LightGBM ensemble. There are 43 features, including technical indicators, returns, and volatility. I balanced the target so that up/down was 50/50 and had a strict 80-10-10 split. Results are shown below. 
 
-### New Model: Balanced Dataset
-The live prediction script now uses the balanced LightGBM artifact at `outputs/balanced_50_50/models/lightgbm_model.pkl`. The training pipeline balances each walk-forward train, validation, and test split independently after chronological splitting, so each split has exactly 50% UP and 50% DOWN labels without moving rows between train, validation, and test windows.
+I am running the 2nd latest model, [balanced-50-50](/outputs/balanced_50_50/), in real time [here](http://52.208.3.202:8097/). I've previously [tried](https://github.com/Cyh1368/crypto-xgboost/) to predict the exact price in 15 minutes with XGBoost, which failed due to contamination of validation data. I've also found it more feasible to predict the direction only.
 
-This removes the old class-prior issue where the original dataset was roughly 40% UP and 60% DOWN. On the original test set, an always-DOWN predictor could score about 60% accuracy, so plain accuracy was misleading. On the balanced test set, the always-UP and always-DOWN baselines are both 50%.
-
-Balanced model results:
-
-| Dataset | Rows | UP ratio | Accuracy | Balanced accuracy | ROC AUC | F1 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Balanced test | 27,094 | 0.5000 | 0.5476 | 0.5476 | 0.5678 | 0.5713 |
-| Balanced validation | 27,342 | 0.5000 | 0.5467 | 0.5467 | 0.5731 | 0.5767 |
-
-The live script is now prediction-only: it fetches live Kraken Futures data, builds the ordered model feature row, averages the fold probabilities, and writes whether BTC is predicted to go UP or DOWN over the next 15 minutes.
-
-![Balanced model calibration curve](outputs/balanced_50_50/figures/validation_calibration_curve.png)
-
-![Balanced model confusion matrix](outputs/balanced_50_50/figures/validation_confusion_matrix.png)
-
-### Cross-Asset Balanced Model Comparison
-Separate balanced models were trained for ETH, SOL, XRP, HYPE, DOGE, and BNB using the same 43 BTC balanced feature columns, LightGBM architecture, walk-forward split settings, split-balancing procedure, and validation metric suite. Each non-BTC model has its own root folder with data, model artifacts, metrics, figures, and a detailed report:
-
-- `ETH/`
-- `SOL/`
-- `XRP/`
-- `HYPE/`
-- `DOGE/`
-- `BNB/`
-
-Performance summary, sorted by balanced test accuracy:
-
-| Asset | Test rows | Test balanced accuracy | Test ROC AUC | Validation balanced accuracy | Validation ROC AUC | Best test regime |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| BTC | 27,094 | 0.5476 | 0.5678 | 0.5467 | 0.5731 | Europe session inactive |
-| ETH | 19,788 | 0.5303 | 0.5381 | 0.5387 | 0.5472 | Low volatility |
-| DOGE | 19,414 | 0.5276 | 0.5397 | 0.5367 | 0.5530 | Europe session active |
-| BNB | 19,448 | 0.5202 | 0.5259 | 0.5193 | 0.5300 | Low volatility |
-| XRP | 19,468 | 0.5177 | 0.5310 | 0.5292 | 0.5391 | US session inactive |
-| SOL | 19,546 | 0.5160 | 0.5263 | 0.5227 | 0.5327 | Medium volatility |
-| HYPE | 17,726 | 0.5106 | 0.5109 | 0.5130 | 0.5199 | High volatility |
-
-BTC remains the strongest model overall. Among the six new non-BTC models, ETH has the best balanced test accuracy, while DOGE has the best non-BTC validation ROC AUC. HYPE is the weakest and has a shorter usable history because Kraken Futures returned no HYPE OHLCV rows; that model uses Binance Vision OHLCV/depth plus Kraken funding history.
-
-## Progress: May 13, 2026
-- Implemented live prediction and web hosting
-- Side note: I have previously tried to predict the actual BTC price in 15 minutes. A contamination of validation data tricked me into thinking that it worked, which it didn't at all. After some research, I have found predicting direction to be more feasible; XGBoost and LightGBM are the best lightweight models for this task, so I chose the latter. 
-
-### Problems
+### Obstacles and Concerns
+In order of importance,
+- Although [balanced-50-50](/outputs/balanced_50_50/) shows a ~55% accuracy in test and validation, its performance is lower than 50% with two days of live data. Could anything be wrong?
+- Is 55% a tradable edge? How high should the accuracy / F1 be to say it's a meaningful signal?
+- What features (see the list below) should I focus on, and what should I not? I am looking into adding order book imbalance.
 - Kalshi's strike price is very hard to predict; it is not the price listed on Kraken, the main data source for the model, nor what is shown on CF Benchmarks' BRTI, which Kalshi claims its prices are based on. I'm not sure whether this will be a big problem, as all that the model needs to predict is the direction, not the exact value of bitcoin. Fortunately, I've found Polymarket's prices to match Kraken's very well. Sadly, Polymarket faces more regulation than Kalshi in the US.
-- The model currently analyzes the order book at the beginning of the 15-minute contract and makes a prediction. I'm concerned that the orderbook may change significantly during the 15 minutes. Thus, I may work on a model that takes in `time-to-next-contract-expiry` as a parameter, and makes a prediction every minute until the contract expires.
-- The original dataset had a DOWN class majority. The current balanced model removes that class-prior bias from train, validation, and test splits.
-
-Everything below is generated by Codex. 
-
----
-
-This repository trains and runs a BTC 15-minute direction classifier using real market data. The model predicts the probability that BTC will close higher over the next 15-minute contract.
-
-The project has two main modes:
-
-- Historical pipeline: download data, build features, train LightGBM, and write evaluation artifacts.
-- Live prediction: fetch Kraken Futures data on 15-minute boundaries, make a direction prediction, evaluate realized outcomes, and serve a live HTTP dashboard.
-
-No synthetic order books, proxy liquidity, fake funding, or inferred depth feeds are generated.
-
-## Setup
-
-```bash
-python3 -m venv binary-venv
-binary-venv/bin/pip install -r references/requirements.txt
-```
-
-The committed live-prediction config expects the trained model at:
-
-```text
-outputs/balanced_50_50/models/lightgbm_model.pkl
-```
-
-## Data Sources
-
-The historical pipeline uses:
-
-- Kraken Futures OHLCV and funding data through `ccxt`.
-- Binance Vision public `bookDepth` archives for historical depth data.
-- Local parquet caches under `data/`.
-
-The live predictor uses Kraken Futures through `ccxt`:
-
-- Symbol: `BTC/USD:USD`
-- Timeframe: `15m`
-- OHLCV history: 500 bars
-- Order book depth: 50 levels
-- Funding rate from the same exchange client
-
-## Features
-
-The trained model currently uses 43 feature columns from `outputs/balanced_50_50/models/feature_list.csv`.
-
-Feature groups:
-
-- Price/OHLCV: `open`, `high`, `low`, `close`, `volume`, `log_return`, `close_open_range`, `high_low_range`, `vwap`, `vwap_distance`
-- Returns: rolling returns over 1, 3, 5, 15, 30, and 60 bars
-- Volatility: realized volatility over 1, 3, 5, 15, 30, and 60 bars
-- Parkinson volatility: 1, 3, 5, 15, 30, and 60 bar windows
-- Regime/session: `hurst_exponent`, `rolling_entropy`, `trend_strength`, `realized_vol_percentile`, `session_asia`, `session_europe`, `session_us`
-- Derivatives/funding: `funding_rate`, `funding_change`, `funding_zscore`
-
-The configured feature windows are:
-
-```yaml
-price_windows: [1, 3, 5, 15, 30, 60]
-orderbook_levels: [5, 10, 20, 50]
-rolling_windows: [20, 60, 240]
-target_horizon_bars: 1
-target_horizon_minutes: 15
-```
-
-The strongest features by mean absolute SHAP value in the current trained artifact are:
-
-| Feature | Mean abs SHAP |
-| --- | ---: |
-| `volume` | 0.07588 |
-| `high_low_range` | 0.03764 |
-| `parkinson_volatility_15` | 0.03461 |
-| `rolling_entropy` | 0.03440 |
-| `parkinson_volatility_3` | 0.03029 |
-| `rolling_return_3` | 0.02607 |
-| `parkinson_volatility_5` | 0.02450 |
-| `parkinson_volatility_30` | 0.02132 |
-| `vwap_distance` | 0.01765 |
-| `rolling_return_5` | 0.01579 |
-
-The strongest features by LightGBM gain are:
-
-| Feature | Gain |
-| --- | ---: |
-| `volume` | 6083.64 |
-| `high_low_range` | 3976.92 |
-| `rolling_entropy` | 2785.35 |
-| `rolling_return_3` | 2337.06 |
-| `parkinson_volatility_15` | 2222.23 |
-| `rolling_return_5` | 2101.31 |
-| `parkinson_volatility_3` | 2095.30 |
-| `parkinson_volatility_5` | 1984.71 |
-| `rolling_return_15` | 1855.98 |
-| `hurst_exponent` | 1801.28 |
-
-## Model
-
-The model is a walk-forward LightGBM binary classifier. The saved artifact contains 17 fold models and averages their predicted probabilities in live inference.
-
-Target:
-
-- Binary classification.
-- `1` means BTC is up over the next 15-minute bar.
-- `0` means BTC is flat/down over the next 15-minute bar.
-
-LightGBM hyperparameters from `config/model.yaml`:
-
-```yaml
-objective: binary
-n_estimators: 2000
-learning_rate: 0.01
-max_depth: 8
-num_leaves: 64
-subsample: 0.8
-colsample_bytree: 0.8
-reg_alpha: 1.0
-reg_lambda: 1.0
-random_state: 42
-n_jobs: -1
-force_col_wise: true
-verbosity: -1
-early_stopping_rounds: 100
-```
-
-Walk-forward split:
-
-```yaml
-train_bars: 12000
-val_bars: 2000
-test_bars: 2000
-step_bars: 2000
-```
-
-## Performance
-
-Balanced test metrics from `outputs/balanced_50_50/metrics/classification_metrics.json`:
-
-| Metric | Value |
-| --- | ---: |
-| Accuracy | 0.5476 |
-| Balanced accuracy | 0.5476 |
-| ROC AUC | 0.5678 |
-| F1 | 0.5713 |
-| Precision | 0.5429 |
-| Recall | 0.6028 |
-| MCC | 0.0959 |
-| Log loss | 0.6853 |
-| Information coefficient | 0.0463 |
-| Mutual information | 0.0132 |
-
-Balanced validation metrics from `outputs/balanced_50_50/metrics/validation_classification_metrics.json`:
-
-| Metric | Value |
-| --- | ---: |
-| Accuracy | 0.5467 |
-| Balanced accuracy | 0.5467 |
-| ROC AUC | 0.5731 |
-| F1 | 0.5767 |
-| Precision | 0.5409 |
-| Recall | 0.6176 |
-| MCC | 0.0943 |
-| Log loss | 0.6823 |
-| Information coefficient | 0.0521 |
-| Mutual information | 0.0090 |
-
-Interpretation: the balanced classifier has modest directional signal above the 50% baseline. These metrics are for predicting the next 15-minute BTC direction.
-
-Regime performance on the balanced test set:
-
-| Regime | Rows | UP ratio | Accuracy | Balanced accuracy | ROC AUC |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Europe session inactive | 16,897 | 0.4936 | 0.5513 | 0.5520 | 0.5725 |
-| Medium volatility | 9,415 | 0.5088 | 0.5528 | 0.5515 | 0.5686 |
-| US session active | 10,279 | 0.5227 | 0.5559 | 0.5494 | 0.5650 |
-| Asia session inactive | 18,129 | 0.5055 | 0.5498 | 0.5489 | 0.5678 |
-| Low volatility | 9,912 | 0.4735 | 0.5494 | 0.5451 | 0.5741 |
-| Asia session active | 8,965 | 0.4888 | 0.5432 | 0.5430 | 0.5657 |
-| US session inactive | 16,815 | 0.4861 | 0.5426 | 0.5427 | 0.5654 |
-| Europe session active | 10,197 | 0.5105 | 0.5416 | 0.5404 | 0.5598 |
-| High volatility | 7,767 | 0.5232 | 0.5391 | 0.5295 | 0.5423 |
-
-Validation regime cross-check:
-
-| Regime | Rows | UP ratio | Accuracy | Balanced accuracy | ROC AUC |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Low volatility | 10,089 | 0.4735 | 0.5593 | 0.5561 | 0.5933 |
-| Europe session inactive | 17,059 | 0.4941 | 0.5498 | 0.5506 | 0.5779 |
-| Asia session inactive | 18,264 | 0.5038 | 0.5510 | 0.5502 | 0.5788 |
-| US session active | 10,360 | 0.5208 | 0.5551 | 0.5485 | 0.5768 |
-| US session inactive | 16,982 | 0.4873 | 0.5415 | 0.5420 | 0.5678 |
-| Europe session active | 10,283 | 0.5098 | 0.5415 | 0.5401 | 0.5651 |
-| Medium volatility | 9,360 | 0.5099 | 0.5401 | 0.5383 | 0.5651 |
-| Asia session active | 9,078 | 0.4923 | 0.5380 | 0.5381 | 0.5611 |
-| High volatility | 7,893 | 0.5221 | 0.5383 | 0.5286 | 0.5468 |
-
-The best test regime by balanced accuracy is when the Europe session is inactive: 0.5520 balanced accuracy and 0.5725 ROC AUC across 16,897 rows. Medium volatility is very close at 0.5515 balanced accuracy. On the validation set, low volatility is the strongest regime with 0.5561 balanced accuracy and 0.5933 ROC AUC. A conservative operating filter would prefer low-to-medium volatility and avoid high-volatility periods, where both test and validation balanced accuracy are lowest.
-
-## Run Historical Pipeline
-
-Run with cached parquet data when available:
-
-```bash
-binary-venv/bin/python scripts/run_pipeline.py
-```
-
-Train a separate balanced model artifact:
-
-```bash
-binary-venv/bin/python scripts/run_pipeline.py --balance-splits --output-subdir balanced_50_50
-```
-
-Force a fresh data download:
-
-```bash
-binary-venv/bin/python scripts/run_pipeline.py --force-download
-```
-
-The first full run can take a while because it downloads public historical archives.
-
-Outputs:
-
-```text
-outputs/
-├── balanced_50_50/
-│   ├── models/
-│   │   ├── lightgbm_model.pkl
-│   │   └── feature_list.csv
-│   ├── predictions/
-│   │   ├── probabilities.parquet
-│   │   ├── test_predictions.parquet
-│   │   └── validation_predictions.parquet
-│   ├── metrics/
-│   │   ├── classification_metrics.json
-│   │   ├── feature_importance.csv
-│   │   ├── feature_psi.json
-│   │   ├── model_comparison.csv
-│   │   ├── regime_metrics.json
-│   │   ├── split_class_balance.csv
-│   │   ├── validation_classification_metrics.json
-│   │   └── shap_importance.csv
-│   └── figures/
-│       ├── calibration_curve.png
-│       ├── confusion_matrix.png
-│       ├── feature_importance.png
-│       ├── prediction_actual_heatmap.png
-│       ├── regime_performance.png
-│       ├── shap_importance.png
-│       ├── validation_calibration_curve.png
-│       ├── validation_confusion_matrix.png
-│       └── validation_prediction_actual_heatmap.png
-```
-
-## Run Live Prediction
-
-Run one live prediction cycle:
-
-```bash
-binary-venv/bin/python binary-paper-trading/run_live_paper_trading.py --once
-```
-
-Run continuously:
-
-```bash
-binary-venv/bin/python binary-paper-trading/run_live_paper_trading.py
-```
-
-The live predictor:
-
-- Wakes shortly after each 15-minute boundary.
-- Fetches Kraken Futures OHLCV, order book, and funding data.
-- Builds the same live feature columns expected by the saved model.
-- Averages probabilities across the saved LightGBM fold models.
-- Writes one prediction row per cycle to `binary-paper-trading/logs/predictions.csv`.
-- Evaluates pending predictions once the matching future 15-minute candle is available.
-
-Live-prediction config is in `binary-paper-trading/config.yaml`:
-
-```yaml
-model_path: outputs/balanced_50_50/models/lightgbm_model.pkl
-seconds_after_boundary: 10
-retry_attempts: 3
-retry_sleep_seconds: 5
-```
-
-Live-prediction logs:
-
-```text
-binary-paper-trading/logs/
-├── paper_trading.log
-├── predictions.csv
-├── actual_outcomes.csv
-├── price_actions.csv
-└── feature_snapshots.jsonl
-```
-
-## Run HTTP Dashboard
-
-Start the dashboard server:
-
-```bash
-binary-venv/bin/python binary-paper-trading/serve_paper_trading_dashboard.py
-```
-
-Open:
-
-```text
-http://127.0.0.1:8080
-```
-
-Useful options:
-
-```bash
-binary-venv/bin/python binary-paper-trading/serve_paper_trading_dashboard.py \
-  --host 127.0.0.1 \
-  --port 8080 \
-  --poll-seconds 5 \
-  --live-price-seconds 10
-```
-
-Dashboard features:
-
-- Current contract timestamp.
-- Current prediction direction and probability.
-- Prediction input close: the exact 15-minute candle close used by the model for the current prediction.
-- Live BTC price: refreshed every 10 seconds from Kraken Futures best bid/ask midpoint.
-- Countdown to the next scheduled prediction.
-- Historical prediction table with timestamp, predicted direction, probability, and actual direction.
-- Green/red row highlighting for correct/incorrect evaluated predictions.
-- Confusion matrix computed from de-duplicated prediction contracts.
-
-If the live predictor is running, the dashboard updates as `predictions.csv` changes. If the live predictor is stopped, historical predictions remain static while the countdown and live BTC price continue updating.
-
-## Real Data Boundary
-
-Public unauthenticated access is available for Kraken Futures data and Binance Vision book depth archives. Coinbase, Bybit, OKX, and other RTI constituent integrations are represented as explicit ingestion stubs that require real API/archive credentials or exported data. They intentionally raise instead of substituting proxy data.
+- Assuming a model takes in OBI data at the beginning of the 15-minute contract. I'm concerned that the orderbook may change significantly during the 15 minutes. Thus, I could work on a model that takes in `time-to-next-contract-expiry` as a parameter, and makes a prediction every minute until the contract expires. However, I'm unsure if this is overcomplicating the problem.
+
+## Optuned-balance
+### Performance
+  | Metric | Test | Validation |
+  |---|---:|---:|
+  | Accuracy | 54.86% | 55.10% |
+  | Balanced accuracy | 54.86% | 55.10% |
+  | ROC AUC | 0.5727 | 0.5765 |
+  | Precision | 54.11% | 54.16% |
+  | Recall | 64.02% | 66.39% |
+  | F1 | 0.5865 | 0.5966 |
+  | MCC | 0.0990 | 0.1047 |
+  | Log loss | 0.6840 | 0.6811 |
+  | Information coefficient | 0.0473 | 0.0551 |
+
+  | Confusion Matrix | Pred Down | Pred Up |
+  |---|---:|---:|
+  | Actual Down | 6,192 | 7,355 |
+  | Actual Up | 4,874 | 8,673 |
+
+![Optuned-balance calibration curve](/outputs/optuned-balanced/figures/calibration_curve.png)
+
+### Features
+
+| Raw Market / OHLCV | Funding / Derivatives | Single-Bar Price Shape | Rolling Returns | Rolling Volatility | Realized Volatility | Parkinson Volatility | Market Regime / Statistical State | Session Flags |
+|---|---|---|---|---|---|---|---|---|
+| `open` | `funding_rate` | `log_return` | `rolling_return_1` | `rolling_volatility_3` | `realized_volatility_1` | `parkinson_volatility_1` | `realized_vol_percentile` | `session_asia` |
+| `high` | `funding_change` | `close_open_range` | `rolling_return_3` | `rolling_volatility_5` | `realized_volatility_3` | `parkinson_volatility_3` | `rolling_entropy` | `session_europe` |
+| `low` | `funding_zscore` | `high_low_range` | `rolling_return_5` | `rolling_volatility_15` | `realized_volatility_5` | `parkinson_volatility_5` | `hurst_exponent` | `session_us` |
+| `close` |  | `vwap` | `rolling_return_15` | `rolling_volatility_30` | `realized_volatility_15` | `parkinson_volatility_15` | `trend_strength` |  |
+| `volume` |  | `vwap_distance` | `rolling_return_30` | `rolling_volatility_60` | `realized_volatility_30` | `parkinson_volatility_30` |  |  |
+|  |  |  | `rolling_return_60` |  | `realized_volatility_60` | `parkinson_volatility_60` |  |  |
+
+## File Structure
+
+| Path | Description |
+|---|---|
+| `config/` | YAML configuration for data sources, feature windows, model parameters, walk-forward splits, thresholds, and trading costs. |
+| `data/raw/` | Cached raw market data, including exchange OHLCV/funding data and Binance order book depth parquet files. |
+| `data/datasets/` | Built model-ready feature datasets, including `BTC_USDT_features.parquet`. |
+| `src/data/` | Data download and raw-data construction code for Kraken futures and Binance Vision depth data. |
+| `src/features/` | Feature engineering modules for price/technical features, order flow, derivatives, regimes, volatility regimes, cross-asset features, and targets. |
+| `src/models/` | Walk-forward split logic and LightGBM training/saving utilities. |
+| `src/evaluation/` | Classification metrics, diagnostics, backtest metrics, statistical tests, and plot generation. |
+| `src/utils/` | Shared I/O and logging helpers. |
+| `scripts/` | Entrypoints for running the BTC pipeline and training archived non-BTC asset models. |
+| `outputs/optuned-balanced/` | Latest tuned balanced BTC LightGBM ensemble, including model artifact, feature list, predictions, metrics, validation report, and figures. |
+| `outputs/balanced_50_50/` | Previous balanced BTC model artifacts and evaluation outputs. |
+| `outputs/models/`, `outputs/metrics/`, `outputs/predictions/`, `outputs/figures/` | Default output locations used by the pipeline when no output subdirectory is supplied. |
+| `binary-paper-trading/` | Live BTC paper-trading predictor, runtime config, dashboard/server code, and live logs. |
+| `archive/Other Coins/` | Archived balanced LightGBM model runs for BNB, DOGE, ETH, HYPE, SOL, and XRP. |
+| `archive/balanced-backtest-live-paper/` | Archived live paper-trading logs/results for the balanced model. |
+| `archive/pre_balanced_dataset_paper_trading_results/` | Archived paper-trading results from an earlier pre-balanced dataset run. |
+| `references/` | Research notes, planning material, and paper-trading reference artifacts. |
