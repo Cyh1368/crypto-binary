@@ -67,10 +67,22 @@ def load_config(config_path: Path) -> dict[str, Any]:
         return yaml.safe_load(f) or {}
 
 
+def infer_model_name(config: dict[str, Any]) -> str:
+    configured = str(config.get("model_name") or "").strip()
+    if configured:
+        return configured
+    model_path = Path(str(config.get("model_path") or ""))
+    if len(model_path.parents) > 1:
+        return model_path.parents[1].name
+    return model_path.stem or "unknown"
+
+
 @dataclass(frozen=True)
 class DashboardConfig:
     logs_dir: Path
     symbol: str
+    model_name: str
+    model_path: str
     timeframe: str
     seconds_after_boundary: int
     poll_seconds: int
@@ -91,6 +103,8 @@ def build_config(config_path: Path, logs_dir: Path | None, poll_seconds: int, li
     return DashboardConfig(
         logs_dir=resolved_logs_dir,
         symbol=str(config.get("symbol", "BTC/USD:USD")),
+        model_name=infer_model_name(config),
+        model_path=str(config.get("model_path", "")),
         timeframe=str(config.get("timeframe", "15m")),
         seconds_after_boundary=seconds_after_boundary,
         poll_seconds=poll_seconds,
@@ -220,6 +234,8 @@ def dashboard_payload(config: DashboardConfig) -> dict[str, Any]:
     return {
         "generated_at": now.isoformat(),
         "logs_dir": str(config.logs_dir),
+        "model_name": config.model_name,
+        "model_path": config.model_path,
         "current": current,
         "history": list(reversed(serialized)),
         "confusion_matrix": confusion_matrix(evaluated),
@@ -334,6 +350,17 @@ INDEX_HTML = """<!doctype html>
       grid-template-columns: 1.5fr repeat(5, minmax(140px, 1fr));
       gap: 12px;
       margin-bottom: 16px;
+    }
+    .model-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+    .model-banner strong {
+      font-size: 18px;
     }
     .panel {
       background: var(--panel);
@@ -480,6 +507,13 @@ INDEX_HTML = """<!doctype html>
 </head>
 <body>
   <main>
+    <section class="model-banner panel">
+      <div>
+        <div class="label">Live Trading Model</div>
+        <strong id="model-name">-</strong>
+      </div>
+      <div class="subtle" id="model-path">-</div>
+    </section>
     <section class="top">
       <div class="metric panel">
         <div class="label">Current Contract Timestamp</div>
@@ -614,6 +648,8 @@ INDEX_HTML = """<!doctype html>
       scheduleRefresh(data.poll_seconds || 5);
 
       const current = data.current;
+      text("model-name", data.model_name || "-");
+      text("model-path", data.model_path || "-");
       text("current-ts", current ? formatTime(current.timestamp) : "-");
       text("current-direction", current?.predicted_direction || "-");
       text("current-probability", current ? pct(current.probability) : "-");

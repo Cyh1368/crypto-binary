@@ -31,6 +31,16 @@ from src.features.volatility import add_volatility_regimes
 
 PRICE_WINDOWS = [1, 3, 5, 15, 30, 60]
 ORDERBOOK_LEVELS = [5, 10, 20, 50]
+LIVE_OBI_HISTORY_BARS = 60
+LIVE_OBI_HISTORY_COLUMNS = [
+    "timestamp",
+    "obi_raw_5",
+    "obi_raw_10",
+    "obi_raw_20",
+    "bid_ask_depth_ratio_5",
+    "bid_ask_depth_ratio_10",
+    "bid_ask_depth_ratio_20",
+]
 
 
 def utc_now() -> datetime:
@@ -96,6 +106,7 @@ class LivePaperTrader:
         self.logs_dir = ROOT / self.config["logs_dir"]
         self.logger = setup_logger(self.logs_dir)
         self.exchange = ccxt.krakenfutures({"enableRateLimit": True})
+        self.model_name = str(self.config.get("model_name") or Path(self.config["model_path"]).parents[1].name)
         artifact = joblib.load(ROOT / self.config["model_path"])
         self.models = artifact["models"]
         self.feature_cols = artifact["feature_cols"]
@@ -110,6 +121,73 @@ class LivePaperTrader:
                 raise RuntimeError(
                     f"Model fold {idx} feature order does not match artifact feature_cols; refusing live prediction"
                 )
+
+    def _obi_history_path(self) -> Path:
+        return self.logs_dir / "live_obi_history.csv"
+
+    def _load_obi_history(self) -> pd.DataFrame:
+        path = self._obi_history_path()
+        if not path.exists():
+            return pd.DataFrame(columns=LIVE_OBI_HISTORY_COLUMNS)
+        history = pd.read_csv(path)
+        for col in LIVE_OBI_HISTORY_COLUMNS:
+            if col not in history:
+                history[col] = np.nan
+        history = history[LIVE_OBI_HISTORY_COLUMNS]
+        history["timestamp"] = pd.to_datetime(history["timestamp"], utc=True, errors="coerce")
+        history = history.dropna(subset=["timestamp"]).drop_duplicates("timestamp", keep="last")
+        return history.sort_values("timestamp")
+
+    def _save_obi_history(self, history: pd.DataFrame) -> None:
+        path = self._obi_history_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        out = history.tail(LIVE_OBI_HISTORY_BARS).copy()
+        out["timestamp"] = out["timestamp"].map(lambda value: pd.Timestamp(value).isoformat())
+        out.to_csv(path, index=False)
+
+    def _apply_live_obi_history(self, latest_ts: pd.Timestamp, latest_features: pd.Series) -> pd.Series:
+        if not any(col.startswith("obi_") or col.startswith("bid_ask_depth_ratio_") for col in self.feature_cols):
+            return latest_features
+
+        snapshot: dict[str, Any] = {"timestamp": latest_ts}
+        missing = []
+        for col in LIVE_OBI_HISTORY_COLUMNS[1:]:
+            value = latest_features.get(col)
+            if pd.isna(value) or not np.isfinite(float(value)):
+                missing.append(col)
+            else:
+                snapshot[col] = float(value)
+        if missing:
+            raise RuntimeError(f"Live order book snapshot is missing OBI inputs: {', '.join(missing)}")
+
+        history = self._load_obi_history()
+        history = history[history["timestamp"] != latest_ts]
+        history = pd.concat([history, pd.DataFrame([snapshot])], ignore_index=True)
+        history = history.sort_values("timestamp").tail(LIVE_OBI_HISTORY_BARS)
+        self._save_obi_history(history)
+
+        raw_5 = history["obi_raw_5"].astype(float)
+        raw_10 = history["obi_raw_10"].astype(float)
+        raw_20 = history["obi_raw_20"].astype(float)
+        latest_features["obi_delta_5"] = float(raw_5.diff().iloc[-1]) if len(raw_5) > 1 else 0.0
+        latest_features["obi_delta_10"] = float(raw_10.diff().iloc[-1]) if len(raw_10) > 1 else 0.0
+        latest_features["obi_pressure_ratio"] = float(raw_5.iloc[-1] / (raw_20.iloc[-1] + 1e-8))
+
+        for window in [3, 5, 15]:
+            values = raw_5.tail(window)
+            latest_features[f"obi_rolling_mean_{window}"] = float(values.mean())
+            latest_features[f"obi_rolling_std_{window}"] = float(values.std()) if len(values) > 1 else 0.0
+
+        z_values = raw_5.tail(LIVE_OBI_HISTORY_BARS)
+        z_std = float(z_values.std()) if len(z_values) > 1 else 0.0
+        latest_features["obi_zscore_5"] = float((raw_5.iloc[-1] - z_values.mean()) / (z_std + 1e-8)) if z_std else 0.0
+        if len(history) < LIVE_OBI_HISTORY_BARS:
+            self.logger.warning(
+                "Live OBI history has %s/%s snapshots; using available history for rolling OBI inputs",
+                len(history),
+                LIVE_OBI_HISTORY_BARS,
+            )
+        return latest_features
 
     def fetch_market_frame(self) -> pd.DataFrame:
         symbol = self.config["symbol"]
@@ -163,6 +241,7 @@ class LivePaperTrader:
         features = add_volatility_regimes(features)
         latest_ts = features.index[-1]
         latest_features = features.loc[latest_ts].copy()
+        latest_features = self._apply_live_obi_history(latest_ts, latest_features)
         model_row = latest_features.reindex(self.feature_cols).astype(float)
         missing = model_row[model_row.isna()]
         if not missing.empty:
@@ -375,7 +454,7 @@ class LivePaperTrader:
         time.sleep(sleep_seconds)
 
     def run(self, once: bool = False) -> None:
-        self.logger.info("Starting BTC LightGBM live direction predictor. once=%s", once)
+        self.logger.info("Starting BTC LightGBM live direction predictor. model=%s once=%s", self.model_name, once)
         while True:
             try:
                 result = self.step()
