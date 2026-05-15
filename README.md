@@ -3,13 +3,13 @@
 I trained several `LightGBM` models to predict whether BTC would go up or down in 15 minutes, which has tradable markets in [Kalshi](https://kalshi.com/category/crypto/frequency/fifteen_min) and [Polymarket](https://polymarket.com/crypto/15M). 
 The latest model, [obi-optuna-500](/outputs/obi-optuna-500/) is trained on 50,000 15-minute bars as a 17-fold walk-forward LightGBM ensemble. There are 59 features, including technical indicators, returns, volatility, and order book imbalance. I balanced the target so that up/down was 50/50 and had a strict 80-10-10 split. Results are shown below. 
 
-I am running [obi-obtuna-500](/outputs/obi-optuna-500/), in real time [here](http://52.208.3.202:8097/). I've previously [tried](https://github.com/Cyh1368/crypto-xgboost/) to predict the exact price in 15 minutes with XGBoost, which failed due to contamination of validation data. I've also found it more feasible to predict the direction only.
+I am running [optuned-balanced](/outputs/optuned-balanced/), in real time [here](http://52.208.3.202:8098/). The latest model, [obi-optuna-500](/outputs/obi-optuna-500/) includes OBI data and is running [here](http://52.208.3.202:8097/). I've previously [tried](https://github.com/Cyh1368/crypto-xgboost/) to predict the exact price in 15 minutes with XGBoost, which failed due to contamination of validation data. I've also found it more feasible to predict the direction only.
 
 ### Obstacles and Concerns
 In order of importance,
 - Although [balanced-50-50](/outputs/balanced_50_50/) shows a ~55% accuracy in test and validation, its performance is lower than 50% with two days of live data. Could anything be wrong?
-- Is 55% a tradable edge? How high should the accuracy / F1 be to say it's a meaningful signal?
-- What features (see the list below) should I focus on, and what should I not? I am looking into adding order book imbalance.
+- How reliable does the signal need to be in this kinds of low signal-to-noise ratio environments? Is 55% a tradable edge? How high should the accuracy / F1 be to say it's a meaningful signal?
+- What features (see the list below) should I focus on, and what should I not?
 - Kalshi's strike price is very hard to predict; it is not the price listed on Kraken, the main data source for the model, nor what is shown on CF Benchmarks' BRTI, which Kalshi claims its prices are based on. I'm not sure whether this will be a big problem, as all that the model needs to predict is the direction, not the exact value of bitcoin. Fortunately, I've found Polymarket's prices to match Kraken's very well. Sadly, Polymarket faces more regulation than Kalshi in the US.
 - Assuming a model takes in OBI data at the beginning of the 15-minute contract. I'm concerned that the orderbook may change significantly during the 15 minutes. Thus, I could work on a model that takes in `time-to-next-contract-expiry` as a parameter, and makes a prediction every minute until the contract expires. However, I'm unsure if this is overcomplicating the problem.
 

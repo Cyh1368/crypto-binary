@@ -28,6 +28,19 @@ DEFAULT_CONFIG = ROOT / "binary-paper-trading" / "config.yaml"
 DEFAULT_LOGS_DIR = ROOT / "binary-paper-trading" / "logs"
 
 
+def resolve_repo_path(path: str | Path) -> Path:
+    candidate = Path(path).expanduser()
+    if candidate.is_absolute():
+        return candidate
+    cwd_candidate = candidate.resolve()
+    if cwd_candidate.exists():
+        return cwd_candidate
+    repo_candidate = (ROOT / candidate).resolve()
+    if repo_candidate.exists():
+        return repo_candidate
+    return cwd_candidate
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -61,8 +74,10 @@ def truthy(value: Any) -> bool | None:
 
 
 def load_config(config_path: Path) -> dict[str, Any]:
-    if yaml is None or not config_path.exists():
-        return {}
+    if yaml is None:
+        raise RuntimeError("PyYAML is not installed; cannot load dashboard config")
+    if not config_path.exists():
+        raise FileNotFoundError(f"Dashboard config not found: {config_path}")
     with config_path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
@@ -919,8 +934,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    logs_dir = Path(args.logs_dir).resolve() if args.logs_dir else None
-    config = build_config(Path(args.config).resolve(), logs_dir, args.poll_seconds, args.live_price_seconds)
+    logs_dir = resolve_repo_path(args.logs_dir) if args.logs_dir else None
+    config = build_config(resolve_repo_path(args.config), logs_dir, args.poll_seconds, args.live_price_seconds)
 
     class ConfiguredDashboardHandler(DashboardHandler):
         pass
