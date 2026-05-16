@@ -3,7 +3,7 @@
 I trained several `LightGBM` models to predict whether BTC would go up or down in 15 minutes, which has tradable markets in [Kalshi](https://kalshi.com/category/crypto/frequency/fifteen_min) and [Polymarket](https://polymarket.com/crypto/15M). 
 The latest model, [obi-optuna-500](/outputs/obi-optuna-500/) is trained on 50,000 15-minute bars as a 17-fold walk-forward LightGBM ensemble. There are 59 features, including technical indicators, returns, volatility, and order book imbalance. I balanced the target so that up/down was 50/50 and had a strict 80-10-10 split. Results are shown below. 
 
-I am running [20feat_0515](/outputs/20feat_0515), in real time [here](http://52.208.3.202:8099/). I've previously [tried](https://github.com/Cyh1368/crypto-xgboost/) to predict the exact price in 15 minutes with XGBoost, which failed due to contamination of validation data. I've also found it more feasible to predict the direction only. Until very recently, I have been mistakenly using raw OHCL as features, a fatal flaw in decision trees.
+I am running [20feat_0515](/outputs/20feat-0515), in real time [here](http://52.208.3.202:8099/). I've previously [tried](https://github.com/Cyh1368/crypto-xgboost/) to predict the exact price in 15 minutes with XGBoost, which failed due to contamination of validation data. I've also found it more feasible to predict the direction only. Until very recently, I have been mistakenly using raw OHCL as features, a fatal flaw in decision trees.
 
 ### Obstacles and Concerns
 In order of importance,
