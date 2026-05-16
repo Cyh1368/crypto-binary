@@ -1,0 +1,8 @@
+2026-05-15 22:50:34,358 [INFO] Starting BTC LightGBM live direction predictor. model=20feat-0515 live_model_folds=[0] once=False
+2026-05-15 22:50:37,313 [INFO] BTC DOWN | contract=2026-05-16T02:45:00+00:00 | model_input_candle_close=2026-05-16T02:30:00+00:00 | model_input_close=79041.00 | p_up=28.29% p_down=71.71% | signal=DOWN
+2026-05-15 22:50:37,314 [INFO] Completed cycle: {"timestamp": "2026-05-16T02:45:00+00:00", "model_input_timestamp": "2026-05-16T02:30:00+00:00", "close": 79041.0, "prediction": {"prob_up": 0.28292037769688944, "prob_down": 0.7170796223031106, "up_percent": 28.292037769688942, "down_percent": 71.70796223031107, "direction": "DOWN", "confidence_percent": 71.70796223031107, "fold_probabilities": [0.28292037769688944], "model_fold_indices": [0]}}
+2026-05-15 22:50:37,314 [INFO] Waiting 572.7s until 2026-05-16T03:00:10+00:00
+2026-05-15 23:00:16,181 [INFO] Evaluated DOWN prediction from 2026-05-16T02:45:00+00:00: actual=UP return=0.000835 correct=False
+2026-05-15 23:00:16,403 [INFO] BTC DOWN | contract=2026-05-16T03:00:00+00:00 | model_input_candle_close=2026-05-16T02:45:00+00:00 | model_input_close=79107.00 | p_up=31.72% p_down=68.28% | signal=DOWN
+2026-05-15 23:00:16,404 [INFO] Completed cycle: {"timestamp": "2026-05-16T03:00:00+00:00", "model_input_timestamp": "2026-05-16T02:45:00+00:00", "close": 79107.0, "prediction": {"prob_up": 0.31719740225376775, "prob_down": 0.6828025977462322, "up_percent": 31.719740225376775, "down_percent": 68.28025977462322, "direction": "DOWN", "confidence_percent": 68.28025977462322, "fold_probabilities": [0.31719740225376775], "model_fold_indices": [0]}}
+2026-05-15 23:00:16,404 [INFO] Waiting 893.6s until 2026-05-16T03:15:10+00:00

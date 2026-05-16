@@ -121,6 +121,7 @@ class LivePaperTrader:
         self.models = artifact["models"]
         self.feature_cols = artifact["feature_cols"]
         self._validate_model_features()
+        self.active_model_indices = self._select_active_model_indices()
         self._validate_history_config()
 
     def _validate_model_features(self) -> None:
@@ -132,6 +133,26 @@ class LivePaperTrader:
                 raise RuntimeError(
                     f"Model fold {idx} feature order does not match artifact feature_cols; refusing live prediction"
                 )
+            classes = list(getattr(model, "classes_", []))
+            if 1 not in classes:
+                raise RuntimeError(f"Model fold {idx} does not expose class 1 for UP predictions")
+
+    def _select_active_model_indices(self) -> list[int]:
+        configured = self.config.get("live_model_folds", "latest")
+        if configured in {None, "", "latest"}:
+            return [len(self.models) - 1]
+        if configured == "all":
+            return list(range(len(self.models)))
+        if isinstance(configured, int):
+            indices = [configured]
+        elif isinstance(configured, list):
+            indices = [int(value) for value in configured]
+        else:
+            raise RuntimeError("live_model_folds must be 'latest', 'all', an integer fold, or a list of folds")
+        invalid = [idx for idx in indices if idx < 0 or idx >= len(self.models)]
+        if invalid:
+            raise RuntimeError(f"live_model_folds contains invalid fold indices: {invalid}")
+        return indices
 
     def _validate_history_config(self) -> None:
         history_bars = int(self.config["history_bars"])
@@ -384,7 +405,11 @@ class LivePaperTrader:
 
     def predict(self, model_row: pd.Series) -> dict[str, Any]:
         X = pd.DataFrame([model_row.to_dict()], columns=self.feature_cols)
-        fold_probabilities = [float(model.predict_proba(X)[0, 1]) for model in self.models]
+        fold_probabilities = []
+        for idx in self.active_model_indices:
+            model = self.models[idx]
+            class_index = list(model.classes_).index(1)
+            fold_probabilities.append(float(model.predict_proba(X)[0, class_index]))
         prob_up = float(np.mean(fold_probabilities))
         prob_down = 1.0 - prob_up
         direction = "UP" if prob_up >= 0.5 else "DOWN"
@@ -397,7 +422,25 @@ class LivePaperTrader:
             "direction": direction,
             "confidence_percent": confidence * 100.0,
             "fold_probabilities": fold_probabilities,
+            "model_fold_indices": self.active_model_indices,
         }
+
+    def prediction_exists(self, contract_ts: pd.Timestamp, model_input_ts: pd.Timestamp) -> bool:
+        predictions_path = self.logs_dir / "predictions.csv"
+        if not predictions_path.exists():
+            return False
+        predictions = pd.read_csv(
+            predictions_path,
+            usecols=lambda col: col in {"timestamp", "model_input_timestamp"},
+            keep_default_na=False,
+        )
+        if predictions.empty or "timestamp" not in predictions:
+            return False
+        timestamps = pd.to_datetime(predictions["timestamp"], utc=True, errors="coerce")
+        if "model_input_timestamp" not in predictions:
+            return bool((timestamps == contract_ts).any())
+        model_input_timestamps = pd.to_datetime(predictions["model_input_timestamp"], utc=True, errors="coerce")
+        return bool(((timestamps == contract_ts) & (model_input_timestamps == model_input_ts)).any())
 
     def log_cycle(
         self,
@@ -407,6 +450,14 @@ class LivePaperTrader:
         prediction: dict[str, Any],
     ) -> None:
         contract_ts = ts + pd.Timedelta(minutes=15)
+        if self.prediction_exists(contract_ts, ts):
+            self.logger.info(
+                "Skipping duplicate prediction for contract=%s model_input_candle_close=%s",
+                contract_ts.isoformat(),
+                ts.isoformat(),
+            )
+            return
+
         raw = frame.loc[ts]
         bids = raw.get("bids", [])
         asks = raw.get("asks", [])
@@ -454,6 +505,7 @@ class LivePaperTrader:
             "model_features": {col: json_default(latest_features.get(col)) for col in self.feature_cols},
             "all_features": {str(k): json_default(v) for k, v in latest_features.to_dict().items() if k not in {"bids", "asks"}},
             "fold_probabilities": prediction["fold_probabilities"],
+            "model_fold_indices": prediction["model_fold_indices"],
         }
         with (self.logs_dir / "feature_snapshots.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(feature_payload, default=json_default, sort_keys=True) + "\n")
@@ -584,7 +636,12 @@ class LivePaperTrader:
         time.sleep(sleep_seconds)
 
     def run(self, once: bool = False) -> None:
-        self.logger.info("Starting BTC LightGBM live direction predictor. model=%s once=%s", self.model_name, once)
+        self.logger.info(
+            "Starting BTC LightGBM live direction predictor. model=%s live_model_folds=%s once=%s",
+            self.model_name,
+            self.active_model_indices,
+            once,
+        )
         while True:
             try:
                 result = self.step()

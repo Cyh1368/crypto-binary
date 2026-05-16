@@ -1,0 +1,20 @@
+{
+  "best_params": {
+    "colsample_bytree": 0.6078542721418663,
+    "learning_rate": 0.06415343818070166,
+    "max_depth": 7,
+    "min_child_samples": 329,
+    "min_child_weight": 0.004166935214151023,
+    "min_split_gain": 0.11624586849576146,
+    "n_estimators": 890,
+    "num_leaves": 12,
+    "reg_alpha": 1.2790015687057066e-05,
+    "reg_lambda": 24.700826674621027,
+    "subsample": 0.5784618216912816,
+    "subsample_freq": 7
+  },
+  "best_value": 0.6559256190888354,
+  "direction": "minimize",
+  "n_trials": 100,
+  "objective": "mean_walk_forward_validation_log_loss"
+}

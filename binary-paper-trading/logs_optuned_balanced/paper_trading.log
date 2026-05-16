@@ -1,0 +1,16 @@
+2026-05-15 21:06:49,931 [INFO] Starting BTC LightGBM live direction predictor. model=optuned-balanced live_model_folds=[16] once=True
+2026-05-15 21:06:49,936 [WARNING] Fetch attempt 1/3 failed: krakenfutures GET https://futures.kraken.com/derivatives/api/v3/instruments
+2026-05-15 21:06:54,937 [WARNING] Fetch attempt 2/3 failed: krakenfutures GET https://futures.kraken.com/derivatives/api/v3/instruments
+2026-05-15 21:06:59,938 [WARNING] Fetch attempt 3/3 failed: krakenfutures GET https://futures.kraken.com/derivatives/api/v3/instruments
+2026-05-15 21:06:59,938 [ERROR] Paper trading cycle failed
+Traceback (most recent call last):
+  File "/home/chengyou1368/crypto-binary/binary-paper-trading/run_live_paper_trading.py", line 647, in run
+    result = self.step()
+  File "/home/chengyou1368/crypto-binary/binary-paper-trading/run_live_paper_trading.py", line 610, in step
+    frame = self.fetch_market_frame()
+  File "/home/chengyou1368/crypto-binary/binary-paper-trading/run_live_paper_trading.py", line 328, in fetch_market_frame
+    raise RuntimeError(f"Failed to fetch live market data after {retry_attempts} attempts: {last_error}")
+RuntimeError: Failed to fetch live market data after 3 attempts: krakenfutures GET https://futures.kraken.com/derivatives/api/v3/instruments
+2026-05-15 21:07:07,922 [INFO] Starting BTC LightGBM live direction predictor. model=optuned-balanced live_model_folds=[16] once=True
+2026-05-15 21:07:10,255 [INFO] BTC DOWN | contract=2026-05-16T01:00:00+00:00 | model_input_candle_close=2026-05-16T00:45:00+00:00 | model_input_close=79067.00 | p_up=43.58% p_down=56.42% | signal=DOWN
+2026-05-15 21:07:10,256 [INFO] Completed cycle: {"timestamp": "2026-05-16T01:00:00+00:00", "model_input_timestamp": "2026-05-16T00:45:00+00:00", "close": 79067.0, "prediction": {"prob_up": 0.4358302330388254, "prob_down": 0.5641697669611746, "up_percent": 43.58302330388254, "down_percent": 56.41697669611746, "direction": "DOWN", "confidence_percent": 56.41697669611746, "fold_probabilities": [0.4358302330388254], "model_fold_indices": [16]}}

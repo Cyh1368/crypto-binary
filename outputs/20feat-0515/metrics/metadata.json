@@ -1,0 +1,142 @@
+{
+  "aggregate_balanced_rows": 38954,
+  "aggregate_params": {
+    "colsample_bytree": 0.6078542721418663,
+    "force_col_wise": true,
+    "learning_rate": 0.06415343818070166,
+    "max_depth": 7,
+    "min_child_samples": 329,
+    "min_child_weight": 0.004166935214151023,
+    "min_split_gain": 0.11624586849576146,
+    "n_estimators": 42,
+    "n_jobs": -1,
+    "num_leaves": 12,
+    "objective": "binary",
+    "random_state": 42,
+    "reg_alpha": 1.2790015687057066e-05,
+    "reg_lambda": 24.700826674621027,
+    "subsample": 0.5784618216912816,
+    "subsample_freq": 7,
+    "verbosity": -1
+  },
+  "feature_cols": [
+    "volume",
+    "high_low_range",
+    "parkinson_volatility_1",
+    "parkinson_volatility_3",
+    "parkinson_volatility_5",
+    "parkinson_volatility_15",
+    "parkinson_volatility_30",
+    "realized_volatility_1",
+    "realized_vol_percentile",
+    "rolling_entropy",
+    "hurst_exponent",
+    "rolling_return_3",
+    "rolling_return_5",
+    "rolling_return_15",
+    "rolling_return_30",
+    "vwap_distance",
+    "close_open_range",
+    "log_return",
+    "session_asia",
+    "session_europe"
+  ],
+  "fold_specs": [
+    {
+      "fold": 1,
+      "train_end": 2940,
+      "val_end": 3234
+    },
+    {
+      "fold": 2,
+      "train_end": 5880,
+      "val_end": 6174
+    },
+    {
+      "fold": 3,
+      "train_end": 8820,
+      "val_end": 9114
+    },
+    {
+      "fold": 4,
+      "train_end": 11760,
+      "val_end": 12054
+    },
+    {
+      "fold": 5,
+      "train_end": 14700,
+      "val_end": 14994
+    },
+    {
+      "fold": 6,
+      "train_end": 17640,
+      "val_end": 17934
+    },
+    {
+      "fold": 7,
+      "train_end": 20580,
+      "val_end": 20874
+    },
+    {
+      "fold": 8,
+      "train_end": 23520,
+      "val_end": 23814
+    },
+    {
+      "fold": 9,
+      "train_end": 26460,
+      "val_end": 26754
+    },
+    {
+      "fold": 10,
+      "train_end": 29400,
+      "val_end": 29694
+    },
+    {
+      "fold": 11,
+      "train_end": 32340,
+      "val_end": 32634
+    },
+    {
+      "fold": 12,
+      "train_end": 35280,
+      "val_end": 35574
+    },
+    {
+      "fold": 13,
+      "train_end": 38220,
+      "val_end": 38514
+    },
+    {
+      "fold": 14,
+      "train_end": 41160,
+      "val_end": 41454
+    },
+    {
+      "fold": 15,
+      "train_end": 44100,
+      "val_end": 44394
+    },
+    {
+      "fold": 16,
+      "train_end": 47040,
+      "val_end": 47334
+    },
+    {
+      "fold": 17,
+      "train_end": 49680,
+      "val_end": 49999
+    }
+  ],
+  "labeled_rows": 49999,
+  "lightgbm_early_stopping_metric": "binary_logloss",
+  "model_name": "20feat-0515",
+  "note": "A 1-bar-ahead target leaves the final raw bar unlabeled, so training used all honest labeled rows.",
+  "optuna_objective": "mean_walk_forward_validation_log_loss",
+  "optuna_trials": 100,
+  "primary_evaluation_metric": "log_loss",
+  "raw_rows": 50000,
+  "recent_inference_ensemble": "models/recent_5_fold_ensemble.pkl",
+  "requested_rows": 50000,
+  "symbol": "BTC_USDT"
+}

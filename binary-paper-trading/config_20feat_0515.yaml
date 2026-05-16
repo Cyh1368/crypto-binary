@@ -1,8 +1,8 @@
 symbol: BTC/USD:USD
-model_name: optuned-balanced
-model_path: outputs/optuned-balanced/models/lightgbm_model.pkl
+model_name: 20feat-0515
+model_path: outputs/20feat-0515/models/fold_17_live_model.pkl
 live_model_folds: latest
-logs_dir: binary-paper-trading/logs_optuned_balanced
+logs_dir: binary-paper-trading/logs_20feat_0515
 timeframe: 15m
 history_bars: 500
 orderbook_limit: 50

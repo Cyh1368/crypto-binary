@@ -11,6 +11,8 @@ It wakes up on 15-minute boundaries, fetches real Kraken Futures data, computes 
 
 No orders are sent to an exchange, and no simulated long/short positions are opened.
 
+`live_model_folds` controls which walk-forward fold is used for live inference. The default is `latest`, which uses the newest trained fold; set it to `all` only when you intentionally want to average every saved walk-forward fold.
+
 ## Run Once
 
 ```bash

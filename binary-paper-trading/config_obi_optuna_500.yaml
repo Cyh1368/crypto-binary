@@ -1,6 +1,7 @@
 symbol: BTC/USD:USD
 model_name: obi-optuna-500
 model_path: outputs/obi-optuna-500/models/lightgbm_model.pkl
+live_model_folds: latest
 logs_dir: binary-paper-trading/logs_obi_optuna_500
 timeframe: 15m
 history_bars: 500

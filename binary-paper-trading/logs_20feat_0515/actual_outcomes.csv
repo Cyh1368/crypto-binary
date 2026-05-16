@@ -1,0 +1,2 @@
+prediction_timestamp,model_input_timestamp,target_timestamp,predicted_direction,prob_up,prob_down,start_close,actual_close_15m,actual_return_15m,actual_direction_15m,prediction_correct,evaluated_at
+2026-05-16T02:45:00+00:00,2026-05-16T02:30:00+00:00,2026-05-16T02:45:00+00:00,DOWN,0.2829203776968894,0.7170796223031106,79041.0,79107.0,0.0008346612518858761,UP,False,2026-05-16T03:00:16.179708+00:00
