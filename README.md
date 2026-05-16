@@ -7,8 +7,8 @@ I am running [20feat_0515](/outputs/20feat-0515), in real time [here](http://52.
 
 ### Obstacles and Concerns
 In order of importance,
-- Although [balanced-50-50](/outputs/balanced_50_50/) shows a ~55% accuracy in test and validation, its performance is lower than 50% with two days of live data. Could anything be wrong?
 - How reliable does the signal need to be in this kinds of low signal-to-noise ratio environments? Is 55% a tradable edge? How high should the accuracy / F1 be to say it's a meaningful signal?
+- Given a viable signal, how to design a tradable logic?
 - What features (see the list below) should I focus on, and what should I not?
 - Kalshi's strike price is very hard to predict; it is not the price listed on Kraken, the main data source for the model, nor what is shown on CF Benchmarks' BRTI, which Kalshi claims its prices are based on. I'm not sure whether this will be a big problem, as all that the model needs to predict is the direction, not the exact value of bitcoin. Fortunately, I've found Polymarket's prices to match Kraken's very well. Sadly, Polymarket faces more regulation than Kalshi in the US.
 - Assuming a model takes in OBI data at the beginning of the 15-minute contract. I'm concerned that the orderbook may change significantly during the 15 minutes. Thus, I could work on a model that takes in `time-to-next-contract-expiry` as a parameter, and makes a prediction every minute until the contract expires. However, I'm unsure if this is overcomplicating the problem.
